@@ -11,9 +11,11 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 ## [Unreleased]
 
 ## [0.1.0] - YYYY-MM-DD <!-- fill in actual release date -->
+
 ### Added
+
 - Initial version of the standard: the four-tier system (Tier 0 through Tier 3), the README
   standard, the CI cookbook (CodeQL, Semgrep, gitleaks, Dependabot, Trivy, Codecov, SonarCloud,
-  concurrency groups, SHA-pinning), the governance guide (CODEOWNERS, branch protection, labels
-  and milestones), the security-docs guide (SECURITY.md structure, vulnerability disclosure), and
-  starter templates.
+  concurrency groups, SHA-pinning, dependency vulnerability auditing), the governance guide
+  (CODEOWNERS, branch protection, labels and milestones), the security-docs guide (SECURITY.md
+  structure, vulnerability disclosure), and starter templates.

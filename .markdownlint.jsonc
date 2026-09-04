@@ -8,5 +8,22 @@
   // repeat structural words like "Pattern"/"Why" as sub-content, not
   // duplicate headings in the strict sense; keep the check but scope it
   // to siblings only.
-  "MD024": { "siblings_only": true }
+  "MD024": { "siblings_only": true },
+  // Numbered steps interrupted by a fenced code block (a common pattern in
+  // the CI cookbook and templates) confuse the strict "1/2/3" ol-prefix
+  // check into treating the next item as a new list starting over; not
+  // worth restructuring every such list to avoid it.
+  "MD029": false,
+  // templates/pull_request_template.md and the issue templates are inserted
+  // into GitHub's own PR/issue body, never rendered as a standalone
+  // document, so they intentionally don't open with a top-level heading.
+  "MD041": false,
+  // templates/README.template.md's table of contents links to placeholder
+  // section names by design; the anchors are meant to be filled in by
+  // whoever adopts the template, not valid in the template itself.
+  "MD051": false,
+  // Exact pipe-spacing/alignment consistency across every table isn't worth
+  // enforcing here; several tables mix compact and aligned styles and it
+  // doesn't affect how they render.
+  "MD060": false
 }

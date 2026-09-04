@@ -61,8 +61,8 @@ See [README.md](README.md#quick-start) for prerequisites and local setup.
    | `docs/<slug>` | Documentation only |
 
 2. Commit using a clear, consistent format. <If the repo uses Conventional
-   Commits, say so and link https://www.conventionalcommits.org/; otherwise
-   describe the house style in one line.>
+   Commits, say so and link `conventionalcommits.org`; otherwise describe the
+   house style in one line.>
 
 3. Run the test suite and any linters/type checks before opening a PR. <List
    the actual commands, e.g. `npm test`, `pytest`, `ruff check .`.> Don't open

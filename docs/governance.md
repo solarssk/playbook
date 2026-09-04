@@ -18,7 +18,7 @@ mechanism, unless paired with the branch-protection setting described below.
 **Tier 0 baseline, every repo:** a single catch-all line, already listed in
 [tiers.md's Tier 0 checklist](tiers.md#tier-0-every-repository):
 
-```
+```text
 * @<maintainer-handle>
 ```
 
@@ -38,7 +38,7 @@ correlate (repos accumulate a second maintainer more often once they're
 Tier 2+), but headcount is the real signal to watch. Once it applies, scope
 entries to the paths each owner actually knows:
 
-```
+```text
 * @<default-owner>
 
 /infra/            @<infra-owner>
