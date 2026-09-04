@@ -1,0 +1,96 @@
+# Tier 1-2 default: ONE combined template covering both bug reports and small
+# feature requests. This is deliberately not split into separate bug/feature/
+# chore/docs templates. A 4-type taxonomy (bug/chore/docs/task) is a Tier 3
+# pattern that earns its complexity only once a repo has enough issue volume,
+# and enough people triaging, that separate intake forms save more time than
+# they cost. See docs/governance.md ("Labels and milestones") for the same
+# reasoning applied to labels. For Tier 3, split this into bug.yml, task.yml,
+# chore.yml, and docs.yml, each with its own narrower fields, and update
+# config.yml's contact links accordingly.
+#
+# Replace <repo-name> / <maintainer-handle> placeholders before publishing.
+
+name: Bug report / feature request
+description: Something isn't working, or you'd like to propose new functionality
+labels: ["triage"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for taking the time to file this. If you're reporting a
+        **security vulnerability**, please stop and use the "Security
+        vulnerability" contact link instead of this form. See this repo's
+        `SECURITY.md`.
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - Bug
+        - Feature request
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened / what would you like to see
+      description: >
+        For a bug: what did you expect, and what happened instead? For a
+        feature request: what problem would this solve, and for whom?
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The release or commit you're running, if known.
+      placeholder: "v0.2.1"
+    validations:
+      required: false
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce (bugs) / proposed approach (features)
+      description: >
+        Concrete, numbered steps if this is a bug. For a feature request,
+        a rough sketch of the approach is welcome but not required.
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / error output
+      description: >
+        Paste relevant log output, if any. **Remove all secrets, tokens,
+        and personal data before posting.**
+    validations:
+      required: false
+
+  # Tier 2 and above only: uncomment and fill in real options if the repo
+  # has clearly separable areas worth routing by. Delete this block entirely
+  # for a repo small enough that "where" is obvious from the description.
+  # - type: dropdown
+  #   id: area
+  #   attributes:
+  #     label: Area
+  #     options:
+  #       - <area-1>
+  #       - <area-2>
+  #       - other
+  #   validations:
+  #     required: false
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Please confirm
+      options:
+        - label: >
+            I removed all secrets, tokens, and personal data from the fields
+            above.
+          required: true

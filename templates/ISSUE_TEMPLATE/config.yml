@@ -1,0 +1,15 @@
+# blank_issues_enabled: false forces every issue through a template. This
+# is what makes the "confirm secrets are scrubbed" checkbox in bug.yml
+# actually load-bearing instead of skippable.
+#
+# The contact link below sends security reports to the private disclosure
+# flow instead of letting anyone file a vulnerability as a public issue.
+# See docs/security-docs.md for why that channel matters. This applies at
+# every tier, including a repo with no other issue template at all.
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/<owner>/<repo-name>/security/advisories/new
+    about: >
+      Please report security vulnerabilities privately. Do not open a
+      public issue. See SECURITY.md for details.

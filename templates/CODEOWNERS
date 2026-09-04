@@ -1,0 +1,28 @@
+# CODEOWNERS
+#
+# Auto-requests review from the listed owner(s) on any pull request that
+# touches a matching path. See docs/governance.md for the full explanation,
+# including why "Require review from Code Owners" in branch protection is
+# inert until a second collaborator with write access exists.
+#
+# --- Tier 0 baseline: one catch-all line covers almost every repo --------
+# Every repository, regardless of tier, gets this line (see docs/tiers.md's
+# Tier 0 checklist). Replace @<maintainer-handle> with the actual GitHub
+# handle. Do not add path-specific rows below this for a single-maintainer
+# repo — there's no second owner to route reviews to, so extra lines are
+# pure noise no matter how large the repo is.
+
+* @<maintainer-handle>
+
+# --- Once there are multiple maintainers: path-specific ownership --------
+# Uncomment and adapt once more than one person has write access, each
+# covering a different area. The trigger is headcount, not tier by itself —
+# this commonly shows up around Tier 2+, since that's when repos tend to
+# accumulate a second maintainer, but a smaller repo that unusually gains
+# one should adopt this early too. More specific patterns override the
+# catch-all above; on a tie, the last matching line in the file wins, so
+# keep the catch-all first and put overrides after it.
+#
+# /infra/              @<infra-owner-handle>
+# /docs/               @<docs-owner-handle>
+# *.sql                 @<db-owner-handle>
