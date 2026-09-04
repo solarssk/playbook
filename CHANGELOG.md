@@ -10,7 +10,7 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 
 ## [Unreleased]
 
-## [0.1.0] - YYYY-MM-DD <!-- fill in actual release date -->
+## [0.1.0] - 2026-09-04
 
 ### Added
 
