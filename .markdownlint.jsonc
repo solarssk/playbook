@@ -1,0 +1,12 @@
+{
+  // Line length is not enforced: this repo's docs use full sentences meant
+  // to be read as prose, not wrapped to a fixed column.
+  "MD013": false,
+  // Templates intentionally use inline HTML comments for adoption guidance.
+  "MD033": false,
+  // Numbered cookbook sections ("## 1. Pin...", "## 2. Concurrency...")
+  // repeat structural words like "Pattern"/"Why" as sub-content, not
+  // duplicate headings in the strict sense; keep the check but scope it
+  // to siblings only.
+  "MD024": { "siblings_only": true }
+}
