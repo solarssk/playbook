@@ -1,0 +1,51 @@
+name: Issue / correction
+description: A doc is wrong, a template is broken, or you'd like to propose a change to the standard
+labels: ["triage"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for taking the time to file this. If you're reporting a
+        **security vulnerability** (e.g. a template or CI snippet that would
+        introduce a real vulnerability if copied as-is), please stop and use
+        the "Security vulnerability" contact link instead of this form. See
+        this repo's `SECURITY.md`.
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - Doc is factually wrong or out of date
+        - Template or CI snippet doesn't work as written
+        - Internal inconsistency (two docs disagree)
+        - Proposed change to the standard itself
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What's wrong, or what would you like to see
+      description: >
+        Link the specific file and section. For a proposed change to the
+        standard, explain which tier it affects and why.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce (for a broken template/snippet)
+      description: What did you copy, and what happened when you used it?
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Please confirm
+      options:
+        - label: I removed all secrets, tokens, and personal data from the fields above.
+          required: true

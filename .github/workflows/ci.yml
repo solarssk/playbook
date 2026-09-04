@@ -35,5 +35,35 @@ jobs:
           python-version: "3.12"
       - name: Validate every YAML file parses
         run: |
-          python -m pip install --break-system-packages pyyaml
+          python -m pip install --break-system-packages pyyaml==6.0.2
           find . -name "*.yml" -o -name "*.yaml" | xargs -I{} python -c "import yaml, sys; yaml.safe_load(open('{}')); print('OK: {}')"
+
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install gitleaks
+        run: |
+          curl -sSL -o gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.0/gitleaks_8.30.0_linux_x64.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          echo "$PWD" >> "$GITHUB_PATH"
+
+      - name: Compute scan range
+        id: range
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "range=origin/${{ github.base_ref }}..HEAD" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            echo "range=${{ github.event.before }}..${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "range=-1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: gitleaks (scoped to this run's commits)
+        run: gitleaks detect --source . --log-opts="${{ steps.range.outputs.range }}" --exit-code 1
