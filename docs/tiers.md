@@ -130,6 +130,11 @@ handles credentials or PII. Everything in Tier 1, plus:
       a release-publishing workflow must never be configured to cancel an in-progress run, only to
       queue behind it.
 - [ ] `CONTRIBUTING.md`, a pull request template, and CODEOWNERS.
+- [ ] A "Documentation impact" section in the PR template, checked in CI against the actual diff
+      rather than trusted on its word. See
+      [ci-cookbook.md](ci-cookbook.md#12-docs-as-source-of-truth-and-catching-stale-docs-at-pr-time).
+      Cheap, doesn't need a Wiki, and catches the specific, recurring failure mode of a PR
+      changing something a doc describes without anyone remembering to update the doc.
 - [ ] Branch protection actually enforced: required status checks that are genuinely required,
       not merely present as unenforced workflow files.
 - [ ] A README badge row: CI status, license, latest release, and container platforms if
@@ -149,10 +154,19 @@ Tier 2, plus:
       the setup detail, including the SonarCloud coverage gotcha that trips up most first
       attempts.
 - [ ] A formal user-facing wiki or docs site, kept separate from the developer-facing README and
-      AGENTS.md. Different audience, different depth.
+      AGENTS.md. Different audience, different depth. If it's a GitHub Wiki, its content lives in
+      the repository itself (for example `docs/wiki/`) and is synced to the Wiki by CI, never
+      edited directly in the Wiki's own web UI. See
+      [ci-cookbook.md](ci-cookbook.md#12-docs-as-source-of-truth-and-catching-stale-docs-at-pr-time)
+      for the sync workflow and the structural checks that keep it from silently drifting.
 - [ ] Auditor-facing security documentation: an architecture overview written for someone doing
       due diligence, a documented incident-response procedure, a data-protection or subprocessor
-      summary if the product touches personal data.
+      summary if the product touches personal data. Any specific, checkable claim in these docs
+      (a required-checks list, a control mapped to a named workflow) is exactly the kind of thing
+      that goes stale unnoticed; a scheduled drift-detector against the live setting is worth the
+      admin-scoped token it needs, at this tier. See
+      [ci-cookbook.md](ci-cookbook.md#12-docs-as-source-of-truth-and-catching-stale-docs-at-pr-time)
+      for why this can't be a PR-time check and what to do instead.
 - [ ] Per-version release notes, not just an aggregate CHANGELOG.
 
 Nothing above this tier is defined here on purpose. If a repository's needs genuinely exceed Tier

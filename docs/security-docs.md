@@ -90,11 +90,19 @@ adds tests, type-checking, and SAST on top of Tier 1's own dependency audit
 and secret-scan steps. Once those exist, the highest-value addition to
 `SECURITY.md` is a
 table mapping each security-relevant control to **where it actually runs**,
-the specific workflow file (and job, if the workflow has several). This does
-two things a prose paragraph doesn't: it's falsifiable (a reader can open the
-named file and confirm the claim), and it forces the maintainer to notice
-when a control quietly stopped running (a workflow renamed, disabled, or
-dropped) the next time they touch the doc.
+the specific workflow file (and job, if the workflow has several). This is
+falsifiable in a way a prose paragraph isn't: a reader can open the named
+file and confirm the claim directly.
+
+Falsifiable is not the same as self-maintaining, though. "The maintainer
+will notice when a control quietly stopped running" is exactly the
+assumption that doesn't hold: a real audit of a repo following this pattern
+found this table undercounting its own required checks by two, for weeks,
+with nothing surfacing it. Pair this table with the PR-time documentation
+declaration in
+[ci-cookbook.md §12](ci-cookbook.md#12-docs-as-source-of-truth-and-catching-stale-docs-at-pr-time)
+so a PR that changes a workflow this table describes is required to say
+whether the table needs updating too, rather than relying on memory.
 
 Structure: one row per control, with, at minimum, what it checks, when it
 runs, and the workflow file. This is a pattern, not a fixed list; use

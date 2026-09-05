@@ -36,6 +36,7 @@ Tier 3 recipe; a Tier 1 repo that suddenly gets real users should move up.
 9. [Codecov (a real signal, not yet a gate)](#9-codecov-a-real-signal-not-yet-a-gate)
 10. [SonarCloud (Automatic Analysis vs CI-based analysis)](#10-sonarcloud-automatic-analysis-vs-ci-based-analysis)
 11. [SBOM generation on release (CycloneDX)](#11-sbom-generation-on-release-cyclonedx)
+12. [Docs as source of truth, and catching stale docs at PR time](#12-docs-as-source-of-truth-and-catching-stale-docs-at-pr-time)
 
 ---
 
@@ -816,3 +817,197 @@ For a Tier 3 project already doing a multi-arch, push-by-digest publish, generat
 platform (suffix the artifact/file name accordingly) and attach both to the same release, alongside
 a build provenance attestation (`actions/attest-build-provenance`). Genuinely worth the extra step
 once the publish pipeline is already this sophisticated, not a starting requirement.
+
+---
+
+## 12. Docs as source of truth, and catching stale docs at PR time
+
+**The problem this solves:** a wiki, a security policy, or a controls table drifts from reality
+the moment the thing it describes changes and nobody remembers to update the doc in the same PR.
+This is not a hypothetical: a real audit of a Tier 3 repo following this exact pattern found its
+own `SECURITY.md` undercounting its required CI checks by two, an architecture doc contradicting
+itself about whether a feature had shipped, and a worked example describing a bug that had
+already been fixed, days to weeks earlier in each case. None of that was caught automatically,
+because nothing was checking.
+
+**When to use it:** the wiki-sync half (below) applies once a repo has a GitHub Wiki (Tier 3, see
+[tiers.md](tiers.md#tier-3-flagship)). The PR-time declaration check (further below) is worth
+adopting from Tier 2 up, even for a repo with no Wiki at all, since it works for any doc a PR
+might need to touch.
+
+### a) If the repo has a Wiki: the Wiki is a build output, not a source
+
+Never edit a GitHub Wiki page directly in its own web UI once this pattern is in place. A direct
+edit is invisible to the repo's history, isn't reviewed, and gets silently overwritten by the
+next sync from the real source.
+
+Keep the actual content in the repository, for example `docs/wiki/`, and sync it to the GitHub
+Wiki with a workflow that runs on every push to the default branch that touches that directory:
+
+```yaml
+# .github/workflows/publish-wiki.yml
+name: Publish Wiki
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/wiki/**"
+      - ".github/workflows/publish-wiki.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-wiki
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate Wiki source
+        run: node scripts/check-wiki-docs.mjs
+
+      - name: Synchronize GitHub Wiki
+        env:
+          WIKI_REMOTE: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.wiki.git
+        run: |
+          wiki_publish_dir=$(mktemp -d)
+          trap 'rm -rf "$wiki_publish_dir"' EXIT
+          git clone "$WIKI_REMOTE" "$wiki_publish_dir"
+          rsync -a --delete --exclude=.git docs/wiki/ "$wiki_publish_dir/"
+          if git -C "$wiki_publish_dir" diff --quiet; then
+            echo "Wiki is already current."
+            exit 0
+          fi
+          git -C "$wiki_publish_dir" config user.name "github-actions[bot]"
+          git -C "$wiki_publish_dir" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$wiki_publish_dir" add --all
+          git -C "$wiki_publish_dir" commit -m "docs(wiki): publish ${GITHUB_SHA}"
+          git -C "$wiki_publish_dir" push origin HEAD:master
+```
+
+`github.token` (the default `GITHUB_TOKEN`) is enough here: pushing to a repo's own Wiki only
+needs `contents: write` on the parent repo, the same permission this job already declares. No
+extra secret to create or rotate.
+
+**"Validate Wiki source" is a script you write for your own repo, not something to copy
+verbatim.** The point is structural checks that catch drift automatically, not any particular
+rule set. A reasonable starting menu, all cheap to implement in a few dozen lines of plain
+Node/Python with no dependencies:
+
+- Every page your docs are supposed to have actually exists (a fixed list of expected filenames,
+  or every page linked from an index/sidebar page actually resolves).
+- Every internal link (`[text](Some-Page)`, an image reference) resolves to a real file inside
+  the docs directory; nothing links outside it or to a page that no longer exists.
+- A required metadata line is present and well-formed if your docs use one, for example a byline
+  stating who a page is for and when it was last verified against the product.
+- No real email address or other non-synthetic personal data leaked into example content (a
+  cheap, high-value anonymization check that pays for itself the first time it fires).
+
+Run this same script both in `publish-wiki.yml` (so a broken sync never reaches the live Wiki)
+and as a required PR check whenever `docs/wiki/**` changes, so the structural problems above are
+caught before merge, not after publish.
+
+### b) Any tier with real docs: declare and verify documentation impact per PR
+
+This doesn't need a Wiki. It needs a PR template section and one script, and it catches the more
+common failure: a PR changes something that should update a doc, and nobody remembers.
+
+Add a required section to `pull_request_template.md`:
+
+```markdown
+## Documentation impact
+
+<!-- Select exactly one. -->
+- [ ] Docs updated
+- [ ] No doc update needed: <state the reason>
+```
+
+Then verify, in CI, that the declaration is actually consistent with the diff instead of trusting
+it on its word:
+
+```yaml
+# .github/workflows/ci.yml (excerpt), on: pull_request
+      - name: Check documentation-impact declaration
+        run: node scripts/check-pr-docs-impact.mjs
+```
+
+```javascript
+// scripts/check-pr-docs-impact.mjs
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+
+const eventPath = process.env.GITHUB_EVENT_PATH;
+const event = JSON.parse(readFileSync(eventPath, "utf8"));
+const pullRequest = event.pull_request;
+if (!pullRequest) process.exit(0);
+
+// Automated dependency PRs can't fill in a hand-written template body.
+const authorLogin = pullRequest.user?.login ?? "";
+const headRef = pullRequest.head?.ref ?? "";
+if (authorLogin === "dependabot[bot]" || headRef.startsWith("dependabot/")) process.exit(0);
+
+const body = pullRequest.body ?? "";
+const docsUpdated = /^- \[[xX]\] Docs updated\s*$/m.test(body);
+const noDocsUpdate = /^- \[[xX]\] No doc update needed: \S.+$/m.test(body);
+
+if (docsUpdated === noDocsUpdate) {
+  console.error(
+    "Select exactly one Documentation impact declaration, with a real reason if none is needed.",
+  );
+  process.exit(1);
+}
+
+// DOCS_PATHS: the paths this repo considers "docs" for this check's purposes.
+// Adjust to match your own layout (docs/wiki/, SECURITY.md, README.md, ...).
+const DOCS_PATHS = ["docs/wiki/", "SECURITY.md"];
+const changedFiles = execFileSync(
+  "/usr/bin/git",
+  ["diff", "--name-only", `${pullRequest.base.sha}...${pullRequest.head.sha}`],
+  { encoding: "utf8" },
+).split("\n").filter(Boolean);
+const docsChanged = changedFiles.some((file) => DOCS_PATHS.some((prefix) => file.startsWith(prefix)));
+
+if (docsUpdated && !docsChanged) {
+  console.error("'Docs updated' is selected but none of the declared doc paths actually changed.");
+  process.exit(1);
+}
+if (noDocsUpdate && docsChanged) {
+  console.error("A declared doc path changed; select 'Docs updated' instead.");
+  process.exit(1);
+}
+
+console.log("Documentation impact declaration is consistent with the diff.");
+```
+
+This needs no extra token or secret: `pull_request.base.sha`/`head.sha` come from the event
+payload GitHub already provides, and diffing the two only needs the checkout already present in
+the job. Widen `DOCS_PATHS` to whatever this repo actually treats as documentation. A `SECURITY.md`
+that lists specific job names as required checks is exactly the kind of file worth including: a
+PR that renames or removes one of those jobs should be forced to say, in its own words, whether
+`SECURITY.md` needs a matching update.
+
+**What this pattern cannot do, and why:** it cannot verify that `SECURITY.md`'s claimed required
+status checks still match what branch protection actually enforces in repo settings. Reading
+branch protection (`GET /repos/{owner}/{repo}/branches/{branch}/protection`) needs a token with
+administrative access to the repository, and `administration` is not one of the scopes a
+workflow's `permissions:` block can grant to the default `GITHUB_TOKEN` (verified against
+GitHub's own documented list of workflow permission scopes: it is not in it). The check above
+verifies internal consistency (does the PR's own claim match its own diff); it cannot verify
+external consistency (does the doc match a live setting that lives outside any file in the repo).
+
+Closing that second gap for real needs a personal access token with repository administration
+access, stored as a secret, and deliberately kept out of the pull-request-triggered path (a
+privileged token has no business being reachable from a workflow anyone can trigger by opening a
+PR). The proportionate way to use one: a separate, scheduled workflow, `workflow_dispatch` plus a
+weekly `schedule`, that fetches the live required-checks list with that token and fails loudly
+(or opens/updates a tracking issue) if it no longer matches what `SECURITY.md` claims. That is a
+drift detector, not a merge gate, and Tier 3 is the tier where the added setup and the ongoing
+custody of an admin-scoped secret are worth it.
