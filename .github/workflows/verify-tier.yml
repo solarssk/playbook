@@ -1,11 +1,13 @@
 name: Verify tier
 
 # A reusable workflow other repositories call to check themselves against
-# the playbook's tier checklist (docs/tiers.md). Pin the call to a specific
-# tag or commit SHA, the same rule this repo asks of everyone else (see
-# docs/ci-cookbook.md #1): a floating `@main` here means a change to this
-# workflow can silently change what "passing" means in every repo that
-# calls it, with no diff for any of them to review.
+# the playbook's tier checklist (docs/tiers.md). Pin the call to a commit
+# SHA, the same rule this repo asks of everyone else (§1): a floating tag
+# or `@main` here means a change to this workflow can silently change what
+# "passing" means in every repo that calls it, with no diff for any of
+# them to review. This repo's own verify-tier.mjs would flag an adopting
+# repo's own `uses: ...@v0.1.1` (a tag, not a SHA) as exactly this kind of
+# violation -- it would be inconsistent to recommend anything looser here.
 #
 # What this can and can't check: file/pattern checks (LICENSE, CODEOWNERS,
 # SHA-pinning, etc.) always run. Repo-settings checks (delete-branch-on-merge,
@@ -19,13 +21,21 @@ name: Verify tier
 #
 #   jobs:
 #     verify-standard:
-#       uses: solarssk/playbook/.github/workflows/verify-tier.yml@v0.1.0
+#       uses: solarssk/playbook/.github/workflows/verify-tier.yml@<commit-sha>  # v0.1.1
 #       secrets:
 #         admin_token: ${{ secrets.PLAYBOOK_ADMIN_TOKEN }}  # optional
 #
 # Tier is auto-detected from the calling repo's own AGENTS.md ("Tier: N" line,
 # added by the pointer block documented in this repo's AGENTS.md) unless the
 # `tier` input below overrides it.
+#
+# PLAYBOOK_RELEASE below must be bumped by hand alongside every tag: there is
+# no reliable way to read back "the ref the caller used to invoke this
+# workflow" from inside a `workflow_call` job (github.action_ref tracks the
+# most recently *run action step*, not the calling ref -- confirmed the hard
+# way, by a real cross-repo run picking up actions/checkout's own SHA
+# instead). Hardcoding it here, checked out explicitly below, means the
+# script that runs always matches this exact version of this exact file.
 
 on:
   workflow_call:
@@ -43,6 +53,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Bump this alongside every tag (see the comment above). It's the ref this
+  # job checks itself out at, independent of whatever ref the caller used.
+  PLAYBOOK_RELEASE: v0.1.1
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -52,11 +67,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Check out the playbook (pinned to the ref that called this workflow)
+      - name: Check out the playbook itself, at this workflow's own release
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: solarssk/playbook
-          ref: ${{ github.action_ref }}
+          ref: ${{ env.PLAYBOOK_RELEASE }}
           path: .playbook-tools
           persist-credentials: false
           sparse-checkout: |

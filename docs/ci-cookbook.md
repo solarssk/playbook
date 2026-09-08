@@ -1058,18 +1058,29 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   verify:
-    uses: solarssk/playbook/.github/workflows/verify-tier.yml@v0.1.0
+    uses: solarssk/playbook/.github/workflows/verify-tier.yml@<commit-sha>  # v0.1.1
     secrets:
       admin_token: ${{ secrets.PLAYBOOK_ADMIN_TOKEN }}  # optional, see below
 ```
 
-Pin the `@v0.1.0` to a real tag, the same rule as every other Action in this document (§1). A
-floating `@main` here means playbook can silently change what "passing" means in every repo that
-calls it, with no diff for any of them to review; a pinned tag means you see and choose the bump,
-and Dependabot's `github-actions` ecosystem (§4) proposes it the same way it proposes any other
-Action version bump.
+Pin the reusable workflow call to a commit SHA, not a tag, the same rule as every other `uses:`
+reference in this document (§1): a floating tag or `@main` here means playbook can silently change
+what "passing" means in every repo that calls it, with no diff for any of them to review. A SHA
+means you see and choose the bump, and Dependabot's `github-actions` ecosystem (§4) proposes it the
+same way it proposes any other Action version bump, comment included, so the tag stays visible next
+to the SHA. Find the SHA for a given release with `git ls-remote --tags
+https://github.com/solarssk/playbook`.
+
+The `permissions:` block on the calling workflow is not optional either. Without it, this workflow
+runs with the repository's default `GITHUB_TOKEN` permissions, which on most repositories is
+broader read/write access than a job that only checks out code and runs a script needs. Set it
+explicitly even though the called workflow also declares its own `permissions: contents: read`;
+each workflow file needs its own block; a caller does not inherit or narrow the callee's.
 
 **What it checks without any extra setup:** LICENSE, CODEOWNERS, SECURITY.md, CONTRIBUTING.md,
 issue and PR templates, SHA-pinning, `permissions:` and `concurrency:` blocks, and a handful of
