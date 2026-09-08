@@ -38,6 +38,7 @@ Tier 3 recipe; a Tier 1 repo that suddenly gets real users should move up.
 11. [SBOM generation on release (CycloneDX)](#11-sbom-generation-on-release-cyclonedx)
 12. [Docs as source of truth, and catching stale docs at PR time](#12-docs-as-source-of-truth-and-catching-stale-docs-at-pr-time)
 13. [Verifying a repo against this standard automatically](#13-verifying-a-repo-against-this-standard-automatically)
+14. [Hash-pinned dependency lockfile (Python: pip-compile)](#14-hash-pinned-dependency-lockfile-python-pip-compile)
 
 ---
 
@@ -64,13 +65,19 @@ steps:
 
 The trailing `# vX.Y.Z` comment is for humans only (GitHub Actions ignores it), but keep it,
 because Dependabot writes and maintains it automatically and it's the only way to eyeball what
-version a pin corresponds to.
+version a pin corresponds to. This depends on the comment already being an exact version: a bare
+major alias like `# v6` is not something Dependabot rewrites in place. A real Dependabot commit
+bumping a pin from v6.2.0 to v7.0.0 has been observed leaving a pre-existing `# v6` comment
+untouched, which now names the wrong major version rather than merely a stale one. Always write
+the exact pinned version in the comment, never a bare major, so Dependabot's own bump PRs keep it
+accurate.
 
 **Finding and updating pins:**
 
 - **Preferred, ongoing:** Dependabot's `github-actions` ecosystem. Add it once and Dependabot opens
-  a PR every time a pinned action's tag moves forward, bumping both the SHA and the version comment
-  together.
+  a PR every time a pinned action's tag moves forward, bumping both the SHA and an already-exact
+  version comment together. It does not retroactively fix a comment that was never an exact
+  version to begin with.
 
   ```yaml
   # .github/dependabot.yml
@@ -430,9 +437,8 @@ jobs:
 `if: always()` so results still reach the Security tab if the scan step failed; `test -f ... ||
 echo ...` guarantees a valid (empty) SARIF file exists even if Semgrep crashed before writing one.
 Swap `p/javascript`/`p/typescript` for the packs matching your stack. Registry configs stack, so
-pass `--config` more than once for a polyglot repo. Tier 3: compile a hash-locked
-`requirements.txt` (`pip-compile --generate-hashes`) and install with `--require-hashes` instead of
-a bare version pin.
+pass `--config` more than once for a polyglot repo. For a Python project, [section 14](#14-hash-pinned-dependency-lockfile-python-pip-compile)
+covers a stronger alternative to a bare version pin.
 
 ---
 
@@ -1099,3 +1105,89 @@ not mean the repo is actually well-maintained: a keyword match for "gitleaks" do
 step still runs correctly, and nothing here can judge whether the declared tier itself is still
 the right one. Treat it as a fast, cheap first pass, not a replacement for actually reading the
 repo the way [AGENTS.md](../AGENTS.md)'s own adoption workflow describes.
+
+---
+
+## 14. Hash-pinned dependency lockfile (Python: pip-compile)
+
+**Why:** Tier 1 requires dependencies to be "version-pinned in the manifest, not left to float on
+every install." A bare `>=` specifier in `pyproject.toml` satisfies nothing: two builds of the
+same commit, weeks apart, can resolve different exact versions of every dependency and every
+transitive dependency. `pip` has no first-class lockfile the way `npm` or `cargo` does, so the
+manifest itself has to stay loose (an application generally should not upper-bound its own direct
+dependencies) while a separate, generated file pins the exact resolved set, including hashes.
+
+**When to use it:** optional at Tier 1, worth adopting once a repo actually publishes an artifact
+(a container image, a package) where "which exact dependency versions shipped" matters, which
+usually means Tier 2. Not required by any tier's checklist; a plain pinned or upper-bounded
+manifest is still a legitimate way to satisfy Tier 1's own item.
+
+**Generate the lockfile:**
+
+```bash
+pip install "pip-tools==7.6.1"
+pip-compile --generate-hashes --allow-unsafe -o requirements.txt pyproject.toml
+```
+
+Pin `pip-tools` itself to an exact version rather than a floating one for local use, even though
+the manifest's own dev-dependency entry can stay loose: pip-tools has had header-rendering
+differences between versions (for example, whether an unset `--no-index` flag gets echoed into the
+generated file's comment header) that can shift the output in a way unrelated to any real
+dependency change, which breaks the drift check below for the wrong reason. `--generate-hashes`
+records a SHA-256 for every distribution `pip` is allowed to install, so a compromised or
+substituted package on the index fails the install rather than silently landing. `--allow-unsafe`
+includes packages pip-tools otherwise excludes by default (`pip`, `setuptools`, and similar); skip
+it only if none of those appear in the resolved set.
+
+**Install from it, and drop `pip` afterward:**
+
+```dockerfile
+COPY pyproject.toml requirements.txt ./
+COPY app ./app
+
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir --require-hashes -r requirements.txt \
+    && pip install --no-cache-dir --no-deps . \
+    && pip uninstall -y pip
+```
+
+`--require-hashes` refuses to install anything that isn't hash-pinned in `requirements.txt`,
+turning a missing or stale hash into a build failure instead of a silent gap. The application
+itself installs with `--no-deps`, since its dependencies are already locked; it isn't
+re-resolving anything. Removing `pip` from the final image after install is a small, real
+hardening step for a service that only ever runs via its own entrypoint and never invokes `pip` at
+runtime: `pip` vendors its own copies of packages like `setuptools`, which periodically pick up
+CVEs of their own, unrelated to anything the application actually uses, that a scanner will flag
+in an image that has no way to reach them.
+
+**Catch drift in CI, don't just trust the committed file:**
+
+```yaml
+# .github/workflows/ci.yml (excerpt)
+jobs:
+  dependency-lock:
+    name: Verify requirements.txt matches pyproject.toml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: pip install "pip-tools==7.6.1"
+      - name: Verify requirements.txt matches pyproject.toml
+        run: |
+          pip-compile --generate-hashes --allow-unsafe -o requirements.txt pyproject.toml
+          git diff --exit-code requirements.txt
+```
+
+This regenerates the lockfile in CI and fails the job if the result differs from what's committed,
+the same shape as the SBOM and Wiki-sync drift checks elsewhere in this document: don't trust that
+a generated file was regenerated, verify it. Set `python-version` here to whatever version the
+image that actually ships is built on, not whatever a repo's other CI jobs happen to use for
+linting or type-checking: `pip-compile` resolves environment-marker-conditional transitive
+dependencies (an `if python_version < "3.13"` clause in some package's own metadata, for example)
+using the interpreter it runs under, so compiling under a different Python version than the
+Dockerfile's base image can reproduce a lockfile that differs from the committed one for a reason
+that has nothing to do with an actual `pyproject.toml` change.

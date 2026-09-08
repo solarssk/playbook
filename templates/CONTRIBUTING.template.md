@@ -7,18 +7,22 @@ This template is written for a Tier 2 repo (has users beyond the maintainer,
 accepts external issues/PRs, and has CI, as defined in docs/tiers.md). Trim
 it down for Tier 1 (solo tool, no external contributors expected yet: keep
 "Before you start," "Development setup," and "Opening a pull request," and
-drop the rest) or expand it for Tier 3 flagship scope: add a Code of Conduct
-link, and, once a second maintainer actually has write access (which often
-but not always coincides with reaching Tier 3), path-specific review routing
-per CODEOWNERS and a stricter "don't merge your own PR" rule. See
-docs/tiers.md for the full tier definitions and docs/governance.md for the
-CODEOWNERS/branch protection detail behind this section.
+drop the rest) or expand it once a second maintainer actually has write
+access (which often but not always coincides with reaching Tier 3):
+path-specific review routing per CODEOWNERS and a stricter "don't merge your
+own PR" rule. See docs/tiers.md for the full tier definitions and
+docs/governance.md for the CODEOWNERS/branch protection detail behind this
+section.
+
+A CODE_OF_CONDUCT.md (see templates/CODE_OF_CONDUCT.template.md) is optional
+at any tier, not tied to Tier 3. Add one and uncomment the line below if the
+repo has one.
 -->
 
 Thanks for your interest in contributing. This document covers the practical
 steps for proposing a change.
 
-<!-- Tier 3 only: uncomment once a CODE_OF_CONDUCT.md exists.
+<!-- Uncomment once a CODE_OF_CONDUCT.md exists (see templates/CODE_OF_CONDUCT.template.md):
 By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 -->
 

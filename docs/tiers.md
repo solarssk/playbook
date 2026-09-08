@@ -89,7 +89,12 @@ external users. Everything in Tier 0, plus:
       an already-pinned dependency set, and it's the one check a stranger can reproduce
       unassisted against bare source. Start report-only if the tool's unfixable-transitive-CVE
       false-positive rate is a concern; gate on it once that's been confirmed quiet.
-- [ ] Dependencies version-pinned in the manifest, not left to float on every install.
+- [ ] Dependencies version-pinned in the manifest, not left to float on every install. A plain
+      pinned or upper-bounded version specifier satisfies this. A hash-pinned lockfile is a
+      stronger, optional technique, worth adopting once a repo ships an artifact where the exact
+      resolved dependency set matters (usually Tier 2). See
+      [ci-cookbook.md](ci-cookbook.md#14-hash-pinned-dependency-lockfile-python-pip-compile) for
+      the Python recipe.
 - [ ] A minimal CI secret-scan step (gitleaks or equivalent), scoped to the pull request's own
       commit range, not a full-history scan. See
       [ci-cookbook.md](ci-cookbook.md#7-gitleaks-ci-secret-scanning-not-a-replacement-for-platform-scanning).
