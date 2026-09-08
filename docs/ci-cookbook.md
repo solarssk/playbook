@@ -37,6 +37,7 @@ Tier 3 recipe; a Tier 1 repo that suddenly gets real users should move up.
 10. [SonarCloud (Automatic Analysis vs CI-based analysis)](#10-sonarcloud-automatic-analysis-vs-ci-based-analysis)
 11. [SBOM generation on release (CycloneDX)](#11-sbom-generation-on-release-cyclonedx)
 12. [Docs as source of truth, and catching stale docs at PR time](#12-docs-as-source-of-truth-and-catching-stale-docs-at-pr-time)
+13. [Verifying a repo against this standard automatically](#13-verifying-a-repo-against-this-standard-automatically)
 
 ---
 
@@ -196,14 +197,37 @@ runtime exposure, and including it is the most common source of noise that gets 
 disabled six months in. `--audit-level=high` (or pip-audit's own severity filtering, where
 available) keeps LOW/MEDIUM findings visible without blocking on them.
 
-**Pattern (language-agnostic, OSV database):**
+**Pattern (language-agnostic, OSV database, for a stack pip-audit/npm audit don't cover):**
+call the reusable workflows this project publishes for exactly this purpose, not its underlying
+action directly. The action's own `action.yml` says plainly it isn't meant for direct use, since
+its behavior can change between minor versions; the reusable workflow is the supported interface.
 
 ```yaml
-      - uses: google/osv-scanner-action/osv-scanner-action@0745d5ee13f9dfa06f2af1b41d5c7b6c1a4c6fd0  # v2.2.2
-        with:
-          scan-args: |-
-            --lockfile=./package-lock.json
+# .github/workflows/osv-scanner.yml
+name: OSV-Scanner
+
+on:
+  pull_request:
+  schedule:
+    - cron: "0 7 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan-pr:
+    if: github.event_name == 'pull_request'
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.5.1
+
+  scan-scheduled:
+    if: github.event_name == 'schedule'
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.5.1
 ```
+
+Pin `@v2.5.1` to whatever the project's current release actually is when you adopt this (check
+its own releases page), and keep it fresh the same way as any other Action, via Dependabot's
+`github-actions` ecosystem (§4).
 
 **Avoiding the "permanently red" failure mode:** a real known-unfixable transitive CVE (no patched
 version published yet) will otherwise block every unrelated PR indefinitely, which is exactly how
@@ -1011,3 +1035,56 @@ weekly `schedule`, that fetches the live required-checks list with that token an
 (or opens/updates a tracking issue) if it no longer matches what `SECURITY.md` claims. That is a
 drift detector, not a merge gate, and Tier 3 is the tier where the added setup and the ongoing
 custody of an admin-scoped secret are worth it.
+
+---
+
+## 13. Verifying a repo against this standard automatically
+
+Everything above is a recipe you copy into your own repo. This playbook also publishes a reusable
+workflow that runs the file- and pattern-based half of [docs/tiers.md](tiers.md)'s checklist for
+you, from one place, so a change to what the standard requires doesn't mean re-copying anything.
+
+**When to use it:** any tier, once a repo has adopted the standard (carries the pointer block from
+[AGENTS.md](../AGENTS.md), "If you were sent here from another repository"). Add it as a required
+status check once you trust its output; report-only first if you're not sure yet what it will say
+about a repo that's never been checked before.
+
+```yaml
+# .github/workflows/verify-standard.yml
+name: Verify standard
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    uses: solarssk/playbook/.github/workflows/verify-tier.yml@v0.1.0
+    secrets:
+      admin_token: ${{ secrets.PLAYBOOK_ADMIN_TOKEN }}  # optional, see below
+```
+
+Pin the `@v0.1.0` to a real tag, the same rule as every other Action in this document (§1). A
+floating `@main` here means playbook can silently change what "passing" means in every repo that
+calls it, with no diff for any of them to review; a pinned tag means you see and choose the bump,
+and Dependabot's `github-actions` ecosystem (§4) proposes it the same way it proposes any other
+Action version bump.
+
+**What it checks without any extra setup:** LICENSE, CODEOWNERS, SECURITY.md, CONTRIBUTING.md,
+issue and PR templates, SHA-pinning, `permissions:` and `concurrency:` blocks, and a handful of
+keyword-based heuristics (a secret-scan step, a dependency-audit step, SAST, a badge row). Tier is
+auto-detected from the calling repo's own `AGENTS.md`.
+
+**What needs `admin_token`, an optional PAT with repository administration access:**
+delete-branch-on-merge, Dependabot security-updates status, and whether branch protection exists
+at all. Skipped and reported as skipped, not silently omitted, if the secret isn't provided. This
+is the same limitation described in §12: `administration` isn't a scope a workflow's own
+`permissions:` block can grant, so there is no way to read these without a token that already has
+that access.
+
+A result of "pass" here means the mechanical checks for the declared tier are satisfied. It does
+not mean the repo is actually well-maintained: a keyword match for "gitleaks" doesn't confirm the
+step still runs correctly, and nothing here can judge whether the declared tier itself is still
+the right one. Treat it as a fast, cheap first pass, not a replacement for actually reading the
+repo the way [AGENTS.md](../AGENTS.md)'s own adoption workflow describes.

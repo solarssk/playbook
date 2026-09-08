@@ -41,6 +41,11 @@ asked to bring it in line with this standard, or to check whether it already is.
    be, and for anything you deliberately did *not* add (a required-review count staying at 0 for
    a solo-maintained repo, for example), say so explicitly rather than leaving a silent gap that
    reads as an oversight later.
+6. **Optionally, wire up automatic verification** so future drift gets caught without another
+   agent re-reading the whole repo: add a workflow that calls
+   [.github/workflows/verify-tier.yml](.github/workflows/verify-tier.yml), pinned to a released
+   tag. See [docs/ci-cookbook.md #13](docs/ci-cookbook.md#13-verifying-a-repo-against-this-standard-automatically)
+   for the exact call and what it can and can't check on its own.
 
 To make step 1 discoverable without re-deriving it every time, that repository's own AGENTS.md
 (or CLAUDE.md) should carry a short pointer block once it's been assessed:
@@ -115,6 +120,7 @@ any one of them is updated.
 | [docs/governance.md](docs/governance.md) | CODEOWNERS, branch protection, labels/milestones, repo settings |
 | [docs/security-docs.md](docs/security-docs.md) | How to write SECURITY.md and handle vulnerability disclosure |
 | [templates/](templates/) | Ready-to-copy starter files |
+| [.github/workflows/verify-tier.yml](.github/workflows/verify-tier.yml) | A reusable workflow another repo calls to check itself against this standard automatically. See docs/ci-cookbook.md #13 |
 
 ## Conventions for this repo's own commits and PRs
 

@@ -1,0 +1,75 @@
+name: Verify tier
+
+# A reusable workflow other repositories call to check themselves against
+# the playbook's tier checklist (docs/tiers.md). Pin the call to a specific
+# tag or commit SHA, the same rule this repo asks of everyone else (see
+# docs/ci-cookbook.md #1): a floating `@main` here means a change to this
+# workflow can silently change what "passing" means in every repo that
+# calls it, with no diff for any of them to review.
+#
+# What this can and can't check: file/pattern checks (LICENSE, CODEOWNERS,
+# SHA-pinning, etc.) always run. Repo-settings checks (delete-branch-on-merge,
+# Dependabot status, branch protection) need `admin_token`, an admin-scoped
+# PAT passed as a secret: `administration` isn't a grantable GITHUB_TOKEN
+# permission, so there's no way around this without one. Without it, those
+# checks are skipped and reported as such, not silently omitted. See
+# docs/ci-cookbook.md #12 for the full reasoning.
+#
+# Usage, in the calling repository's own workflow:
+#
+#   jobs:
+#     verify-standard:
+#       uses: solarssk/playbook/.github/workflows/verify-tier.yml@v0.1.0
+#       secrets:
+#         admin_token: ${{ secrets.PLAYBOOK_ADMIN_TOKEN }}  # optional
+#
+# Tier is auto-detected from the calling repo's own AGENTS.md ("Tier: N" line,
+# added by the pointer block documented in this repo's AGENTS.md) unless the
+# `tier` input below overrides it.
+
+on:
+  workflow_call:
+    inputs:
+      tier:
+        description: 'Tier to verify against (0-3). Leave unset to auto-detect from AGENTS.md.'
+        required: false
+        type: string
+        default: 'auto'
+    secrets:
+      admin_token:
+        description: 'Optional PAT with repository admin access, for the settings-level checks. Repo-settings checks are skipped, not failed, without it.'
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the calling repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out the playbook (pinned to the ref that called this workflow)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: solarssk/playbook
+          ref: ${{ github.action_ref }}
+          path: .playbook-tools
+          persist-credentials: false
+          sparse-checkout: |
+            scripts
+            docs
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Run tier verification
+        env:
+          INPUT_TIER: ${{ inputs.tier }}
+          ADMIN_TOKEN: ${{ secrets.admin_token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node .playbook-tools/scripts/verify-tier.mjs

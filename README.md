@@ -86,6 +86,7 @@ below to go straight to the document you need.
 | [docs/governance.md](docs/governance.md) | CODEOWNERS, branch protection, labels and milestones, and the repository settings each tier expects. |
 | [docs/security-docs.md](docs/security-docs.md) | How to write `SECURITY.md` and handle vulnerability disclosure, by tier. |
 | [templates/](templates/) | Ready-to-copy starter files: a README template, `CONTRIBUTING.md`, `SECURITY.md`, `CODEOWNERS`, and issue and pull request templates. |
+| [.github/workflows/verify-tier.yml](.github/workflows/verify-tier.yml) | A reusable workflow another repository calls to check itself against this standard automatically, from one place. See docs/ci-cookbook.md #13. |
 
 Nothing here needs to be read end to end. Read the one document your question maps
 to, and follow its own links from there. If you are new to this repository and not
