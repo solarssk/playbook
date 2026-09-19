@@ -21,9 +21,6 @@ from dataclasses import dataclass, field
 
 import yaml
 
-# Indentation is accepted at any depth here, unlike in verify-lib: this scanner validates examples
-# nested under list items, whose fences are indented to the item's content.
-FENCE_OPEN = re.compile(r"^([ \t]*)(`{3,}|~{3,})[ \t]*([^\s`]*)(.*)$")
 FENCE_CLOSE = re.compile(r"^[ \t]*(`{3,}|~{3,})[ \t]*$")
 CHECKED_LANGUAGES = {"yaml", "yml", "json"}
 SKIP_DIRS = {".git", "node_modules", ".snippet-workflows"}
@@ -46,15 +43,32 @@ class Fence:
         self.body.append(line[len(self.indent):] if line.startswith(self.indent) else line.lstrip())
 
 
+def parse_fence_open(line: str):
+    """Return (indent, marker, language) if `line` opens a fence, else None.
+
+    Indentation is accepted at any depth, unlike in verify-lib: this scanner validates examples
+    nested under list items, whose fences are indented to the item's content. The info string of
+    a backtick fence may not contain a backtick.
+    """
+    stripped = line.lstrip(" \t")
+    if not stripped or stripped[0] not in "`~":
+        return None
+    marker = stripped[: len(stripped) - len(stripped.lstrip(stripped[0]))]
+    info = stripped[len(marker):]
+    if len(marker) < 3 or (marker[0] == "`" and "`" in info):
+        return None
+    words = info.split()
+    return line[: len(line) - len(stripped)], marker, (words[0].lower() if words else "")
+
+
 def iter_fences(text: str):
     """Yield every closed fenced block in a Markdown document."""
     fence = None
     for number, line in enumerate(text.splitlines(), start=1):
         if fence is None:
-            opened = FENCE_OPEN.match(line)
-            # The info string of a backtick fence may not contain a backtick.
-            if opened and not (opened.group(2).startswith("`") and "`" in opened.group(4)):
-                fence = Fence(opened.group(1), opened.group(2), opened.group(3).lower(), number)
+            opened = parse_fence_open(line)
+            if opened:
+                fence = Fence(*opened, number)
         elif fence.closed_by(line):
             yield fence
             fence = None

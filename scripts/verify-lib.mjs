@@ -52,10 +52,14 @@ export function detectDeclaredTier(markdown) {
 // makes the line indented code, not a fence. And the info string of a backtick
 // fence may not itself contain a backtick.
 function fenceRun(line) {
-  const match = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
-  if (match === null) return null;
-  const [, run, rest] = match;
-  return run.startsWith("`") && rest.includes("`") ? null : run;
+  let start = 0;
+  while (line[start] === " ") start += 1;
+  const char = line[start];
+  if (start > 3 || (char !== "`" && char !== "~")) return null;
+  let end = start;
+  while (line[end] === char) end += 1;
+  if (end - start < 3) return null;
+  return char === "`" && line.slice(end).includes("`") ? null : line.slice(start, end);
 }
 
 // Removes fenced code blocks, line by line, following CommonMark: a block opens on
