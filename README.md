@@ -12,9 +12,14 @@ repositories, keeping what worked, and being explicit about what is overkill for
 small project versus what a larger one actually needs. It is deliberately not a copy
 of any single existing repository's setup: "the most sophisticated repo in the org
 does X" is treated as one input to a tiering decision, never as the decision itself.
-This repository is itself maintained at Tier 1: small, single-purpose, one
-maintainer, which is why its own README skips the badge row and the audience-routing
-table that a larger project in this same standard would need.
+This repository is itself held to the standard at Tier 2, and its own CI enforces that:
+other repositories run its reusable workflow and script with their own tokens, so its blast
+radius is larger than its size suggests. It skips the audience-routing table that a larger
+project would need, because it has one audience and one entry point.
+
+[![CI](https://github.com/solarssk/playbook/actions/workflows/ci.yml/badge.svg)](https://github.com/solarssk/playbook/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/solarssk/playbook)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/solarssk/playbook)](https://github.com/solarssk/playbook/releases/latest)
 
 ## Table of contents
 
@@ -80,7 +85,7 @@ below to go straight to the document you need.
 | Document | Covers |
 |---|---|
 | [AGENTS.md](AGENTS.md) | The full standard and adoption workflow, written for AI coding agents. Read natively by Cursor and other AGENTS.md-adopting agent tools; Claude Code reads it through a one-line `CLAUDE.md` stub instead of a second, duplicated file. |
-| [docs/tiers.md](docs/tiers.md) | The four-tier system itself: how to pick a tier, and each tier's checklist. Start here for "what does my repo actually need." |
+| [docs/tiers.md](docs/tiers.md) | The four-tier system itself: how to pick a tier, an "At a glance" table of every requirement by tier, and each tier's checklist. Start here for "what does my repo actually need." |
 | [docs/readme-standard.md](docs/readme-standard.md) | How a README should be structured, section by section, per tier. This README follows it. |
 | [docs/ci-cookbook.md](docs/ci-cookbook.md) | Copy-paste CI recipes: SHA-pinning actions, concurrency groups, CodeQL, Semgrep, gitleaks, Dependabot, container scanning, Codecov, SonarCloud. |
 | [docs/openssf.md](docs/openssf.md) | OpenSSF Scorecard workflow and the Best Practices badge: which tier each belongs to, how to read the score, and what not to chase. |
