@@ -1,0 +1,17 @@
+# Thresholds are explicit rather than Codecov's defaults. Not a merge gate: the statuses
+# appear on every pull request, and making one required is a separate decision.
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: auto
+        threshold: 1%
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false

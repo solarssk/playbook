@@ -47,6 +47,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
+          # The SonarCloud scan below needs full history, not the default shallow
+          # clone, to tell new code from existing code.
+          fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
           node-version: "22"
@@ -54,10 +57,47 @@ jobs:
         run: |
           set -euo pipefail
           for script in scripts/*.mjs; do node --check "$script"; done
-      - name: Unit tests
-        run: node --test "scripts/**/*.test.mjs"
+      - name: Unit tests, with coverage
+        run: |
+          set -euo pipefail
+          mkdir -p coverage
+          node --test --experimental-test-coverage \
+            --test-coverage-exclude="scripts/**/*.test.mjs" \
+            --test-reporter=spec --test-reporter-destination=stdout \
+            --test-reporter=lcov --test-reporter-destination=coverage/lcov.info \
+            --test-reporter=junit --test-reporter-destination=junit.xml \
+            "scripts/**/*.test.mjs"
       - name: Release bookkeeping agrees (workflow pin and CHANGELOG)
         run: node scripts/release-check.mjs
+
+      - name: Upload coverage to Codecov
+        # Fork and Dependabot PRs can't read repository secrets; the tests above still run.
+        if: ${{ env.CODECOV_TOKEN != '' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5  # v7.1.1
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          token: ${{ env.CODECOV_TOKEN }}
+          files: coverage/lcov.info
+          fail_ci_if_error: true
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && env.CODECOV_TOKEN != '' }}
+        uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3  # v1.2.1
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          token: ${{ env.CODECOV_TOKEN }}
+          files: junit.xml
+
+      # CI-based analysis (sonar-project.properties), not SonarCloud's Automatic Analysis, which
+      # must stay off. Skipped on fork PRs, which can't read SONAR_TOKEN.
+      - name: SonarCloud scan
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4  # v8.2.2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
 
   lint-workflows:
     name: Lint workflows (actionlint, zizmor)

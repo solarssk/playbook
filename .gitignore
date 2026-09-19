@@ -1,2 +1,6 @@
 # Written by scripts/check_doc_snippets.py --extract for actionlint; never committed.
 .snippet-workflows/
+
+# Written by the test job for Codecov and SonarCloud.
+coverage/
+junit.xml
