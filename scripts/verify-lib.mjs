@@ -213,3 +213,31 @@ export function readDocsImpactDeclaration(body) {
     noDocsUpdate: /^- \[[xX]\] No doc update needed: (?!<state the reason>\s*$)\S.+$/m.test(body),
   };
 }
+
+// Escapes text for one cell of a Markdown table. The backslash goes first: escaping
+// only the pipe leaves a trailing backslash free to cancel the pipe's own escape.
+export function escapeTableCell(text) {
+  return String(text).replaceAll("\\", "\\\\").replaceAll("|", "\\|").replaceAll("\n", " ");
+}
+
+// Text that came from a network response, made safe to print into a Markdown
+// summary: anything outside a plain-text allowlist becomes "?", and the length is
+// capped. The allowlist covers what a check name, a branch, or a status legitimately
+// contains, and leaves out every character Markdown or HTML would act on.
+export function untrustedText(value, maxLength = 200) {
+  const cleaned = String(value).replaceAll(/[^\w .,:;()/@#+=-]/g, "?");
+  return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength - 1)}?` : cleaned;
+}
+
+// The literal `ref:` of the step that checks out this repository's own scripts in
+// verify-tier.yml, or null. Read as a literal on purpose: an expression there
+// (`${{ env.X }}`) is something static analysis cannot prove constant.
+export function readPlaybookCheckoutRef(workflowText) {
+  let inPlaybookCheckout = false;
+  for (const line of stripYamlComments(workflowText).split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("repository:")) inPlaybookCheckout = unquote(trimmed.slice("repository:".length).trim()) === "solarssk/playbook";
+    else if (inPlaybookCheckout && trimmed.startsWith("ref:")) return unquote(trimmed.slice("ref:".length).trim());
+  }
+  return null;
+}

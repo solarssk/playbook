@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   detectDeclaredTier,
+  escapeTableCell,
   extractChangelogSection,
   findFloatingActionRefs,
   isNewer,
@@ -10,10 +11,12 @@ import {
   parseVersion,
   readDocsImpactDeclaration,
   readPinnedRelease,
+  readPlaybookCheckoutRef,
   reportedCheckPatterns,
   stripFencedBlocks,
   stripYamlComments,
   unmatchedRequiredContexts,
+  untrustedText,
   workflowTriggers,
 } from "./verify-lib.mjs";
 
@@ -231,4 +234,37 @@ test("a backtick fence whose info string contains a backtick is not a fence", ()
 test("a closing fence indented four spaces does not close the block", () => {
   assert.equal(stripFencedBlocks("a\n```\nx\n    ```\nstill inside\n```\nb"), "a\nb");
   assert.equal(stripFencedBlocks("a\n```\nx\n    ```\nnever closed"), "a");
+});
+
+test("escapeTableCell escapes the backslash before the pipe, so a trailing backslash cannot cancel it", () => {
+  assert.equal(escapeTableCell("a|b"), "a\\|b");
+  assert.equal(escapeTableCell("ends with \\"), "ends with \\\\");
+  // The case an escape of the pipe alone gets wrong: "\|" must not become "\\|" (an escaped backslash
+  // followed by a live pipe).
+  assert.equal(escapeTableCell("x\\|y"), "x\\\\\\|y");
+  assert.equal(escapeTableCell("two\nlines"), "two lines");
+});
+
+test("untrustedText keeps plain names and replaces anything Markdown or HTML would act on", () => {
+  assert.equal(untrustedText("Secret scan (gitleaks)"), "Secret scan (gitleaks)");
+  assert.equal(untrustedText("scan-pr / osv-scan"), "scan-pr / osv-scan");
+  assert.equal(untrustedText("<img src=x onerror=1>[a](b)`c`*d*|e"), "?img src=x onerror=1??a?(b)?c??d??e");
+  assert.equal(untrustedText("line one\nline two"), "line one?line two");
+  assert.equal(untrustedText("x".repeat(500)).length, 200);
+});
+
+test("readPlaybookCheckoutRef reads the literal ref of the playbook checkout only", () => {
+  const workflow = [
+    "      - uses: actions/checkout@0123456789012345678901234567890123456789",
+    "        with:",
+    "          ref: not-this-one",
+    "      - uses: actions/checkout@0123456789012345678901234567890123456789",
+    "        with:",
+    "          repository: solarssk/playbook",
+    "          ref: v0.2.0 # comment",
+    "          path: .playbook-tools",
+  ].join("\n");
+  assert.equal(readPlaybookCheckoutRef(workflow), "v0.2.0");
+  assert.equal(readPlaybookCheckoutRef("repository: other/repo\nref: v9.9.9\n"), null);
+  assert.equal(readPlaybookCheckoutRef("nothing here"), null);
 });
