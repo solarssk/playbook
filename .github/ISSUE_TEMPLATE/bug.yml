@@ -1,6 +1,5 @@
 name: Issue / correction
 description: A doc is wrong, a template is broken, or you'd like to propose a change to the standard
-labels: ["triage"]
 body:
   - type: markdown
     attributes:

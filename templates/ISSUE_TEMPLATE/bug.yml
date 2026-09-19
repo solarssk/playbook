@@ -12,7 +12,6 @@
 
 name: Bug report / feature request
 description: Something isn't working, or you'd like to propose new functionality
-labels: ["triage"]
 body:
   - type: markdown
     attributes:

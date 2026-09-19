@@ -33,10 +33,90 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
-      - name: Validate every YAML file parses
+      - name: Install hash-pinned dependencies
         run: |
-          python -m pip install --break-system-packages pyyaml==6.0.2
-          find . -name "*.yml" -o -name "*.yaml" | xargs -I{} python -c "import yaml, sys; yaml.safe_load(open('{}')); print('OK: {}')"
+          python -m pip install --require-hashes --only-binary :all: --no-deps -r scripts/requirements.txt
+      - name: Every YAML file parses
+        run: python scripts/validate_yaml.py
+      - name: Every YAML and JSON snippet in the Markdown parses
+        run: python scripts/check_doc_snippets.py
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: "22"
+      - name: Scripts are syntactically valid
+        run: |
+          set -euo pipefail
+          for script in scripts/*.mjs; do node --check "$script"; done
+      - name: Unit tests
+        run: node --test "scripts/**/*.test.mjs"
+      - name: Release bookkeeping agrees (workflow pin and CHANGELOG)
+        run: node scripts/release-check.mjs
+
+  lint-workflows:
+    name: Lint workflows (actionlint, zizmor)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install hash-pinned dependencies
+        run: |
+          python -m pip install --require-hashes --only-binary :all: --no-deps -r scripts/requirements.txt
+
+      # Complete workflows quoted in the docs are copied into real CI files, so
+      # they get the same expression and shell checks as this repository's own.
+      - name: Extract workflow snippets from the docs
+        run: python scripts/check_doc_snippets.py --extract
+
+      - name: Install actionlint (checksum-verified)
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          set -euo pipefail
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl --proto '=https' --tlsv1.2 -sSfL -o "$archive" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          echo "${ACTIONLINT_SHA256}  ${archive}" | sha256sum --check --strict
+          tar -xzf "$archive" actionlint
+          echo "$PWD" >> "$GITHUB_PATH"
+
+      - name: actionlint
+        run: |
+          set -euo pipefail
+          find .github/workflows .snippet-workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) -print0 | xargs -0 actionlint
+
+      - uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482  # v0.6.4
+        with:
+          version: v1.30.0
+          advanced-security: false
+          annotations: true
+
+  self-verify:
+    name: Verify against this standard (Tier 2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: "22"
+      # This repository is held to the same checklist it publishes. Warnings
+      # are worth reading; a failing check fails the build.
+      - name: verify-tier
+        env:
+          INPUT_TIER: "2"
+        run: node scripts/verify-tier.mjs
 
   secret-scan:
     name: Secret scan (gitleaks)
@@ -47,23 +127,36 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Install gitleaks
+      - name: Install gitleaks (checksum-verified)
+        env:
+          GITLEAKS_VERSION: "8.30.0"
+          GITLEAKS_SHA256: 79a3ab579b53f71efd634f3aaf7e04a0fa0cf206b7ed434638d1547a2470a66e
         run: |
-          curl -sSL -o gitleaks.tar.gz \
-            https://github.com/gitleaks/gitleaks/releases/download/v8.30.0/gitleaks_8.30.0_linux_x64.tar.gz
-          tar -xzf gitleaks.tar.gz gitleaks
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl --proto '=https' --tlsv1.2 -sSfL -o "$archive" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum --check --strict
+          tar -xzf "$archive" gitleaks
           echo "$PWD" >> "$GITHUB_PATH"
 
       - name: Compute scan range
         id: range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "range=origin/${{ github.base_ref }}..HEAD" >> "$GITHUB_OUTPUT"
-          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-            echo "range=${{ github.event.before }}..${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "range=origin/${BASE_REF}..HEAD" >> "$GITHUB_OUTPUT"
+          elif [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            echo "range=${BEFORE_SHA}..${HEAD_SHA}" >> "$GITHUB_OUTPUT"
           else
             echo "range=-1" >> "$GITHUB_OUTPUT"
           fi
 
       - name: gitleaks (scoped to this run's commits)
-        run: gitleaks detect --source . --log-opts="${{ steps.range.outputs.range }}" --exit-code 1
+        env:
+          SCAN_RANGE: ${{ steps.range.outputs.range }}
+        run: gitleaks detect --source . --log-opts="$SCAN_RANGE" --exit-code 1
