@@ -203,8 +203,8 @@ test("verify-tier reads the tier from AGENTS.md, and refuses to guess without on
 
 const REPO_OK = { default_branch: "main", delete_branch_on_merge: true, security_and_analysis: { dependabot_security_updates: { status: "enabled" } } };
 
-function settings(routes) {
-  return run("verify-tier.mjs", { env: { INPUT_TIER: "0", ADMIN_TOKEN: "token", GITHUB_REPOSITORY: "o/r", MOCK_FETCH: JSON.stringify(routes) }, mock: true });
+function settings(routes, extraEnv = {}) {
+  return run("verify-tier.mjs", { env: { INPUT_TIER: "0", ADMIN_TOKEN: "token", GITHUB_REPOSITORY: "o/r", MOCK_FETCH: JSON.stringify(routes), ...extraEnv }, mock: true });
 }
 
 test("verify-tier reports required checks, and sanitizes a hostile name from the API", () => {
@@ -242,4 +242,29 @@ test("verify-tier stays quiet when the pin is current, and skips when it cannot 
   assert.match(versionCheck("v1.0.0", { "releases/latest": { status: 404 } }).out, /Could not check for a newer release/);
   assert.match(versionCheck("v1.0.0", {}).out, /Could not check for a newer release/);
   assert.match(versionCheck("main", {}).out, /PLAYBOOK_RELEASE is not set to a vX\.Y\.Z tag/);
+});
+
+test("verify-tier writes nothing that came from the network into the step-summary file", () => {
+  const summary = join(fixture(), "summary.md");
+  const routes = {
+    "repos/o/r": { body: { ...REPO_OK, security_and_analysis: { dependabot_security_updates: { status: "<i>weird</i>" } } } },
+    "branches/main/protection": { body: { required_status_checks: { contexts: ["<b>evil|x"] } } },
+    "releases/latest": { body: { tag_name: "v9.0.0" } },
+  };
+  const result = settings(routes, { PLAYBOOK_RELEASE: "v0.1.0", GITHUB_STEP_SUMMARY: summary });
+  const file = readFileSync(summary, "utf8");
+  assert.doesNotMatch(file, /evil|weird|v9\.0\.0/);
+  assert.match(file, /The job log lists them/);
+  assert.match(file, /The job log names it/);
+  // The job log still gets the detail, sanitized.
+  assert.match(result.out, /No workflow job reports as: \?b\?evil\?x/);
+  assert.match(result.out, /Status: \?i\?weird\?\/i\?/);
+});
+
+test("verify-tier rejects a repository name or default branch that could change the request path", () => {
+  assert.match(settings({}, { GITHUB_REPOSITORY: "o/../x" }).out, /GITHUB_REPOSITORY is not an owner\/repository name/);
+  assert.match(settings({ "repos/o/r": { body: { ...REPO_OK, default_branch: "../../admin" } } }).out, /not a plain branch name/);
+  // A branch name with a slash is encoded into one path segment, not split.
+  const slashed = settings({ "repos/o/r": { body: { ...REPO_OK, default_branch: "release/1" } }, "branches/release%2F1/protection": { status: 404 } });
+  assert.match(slashed.out, /No branch protection configured/);
 });
