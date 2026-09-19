@@ -61,7 +61,7 @@ export function stripFencedBlocks(markdown) {
     if (open === null) {
       if (run === null) kept.push(line);
       else open = { char: run[0], length: run.length };
-    } else if (run !== null && run[0] === open.char && run.length >= open.length && line.trim() === run) {
+    } else if (run !== null && run.startsWith(open.char) && run.length >= open.length && line.trim() === run) {
       open = null;
     }
   }
