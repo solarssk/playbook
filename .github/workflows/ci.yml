@@ -91,13 +91,17 @@ jobs:
           files: junit.xml
 
       # CI-based analysis (sonar-project.properties), not SonarCloud's Automatic Analysis, which
-      # must stay off. Skipped on fork PRs, which can't read SONAR_TOKEN.
+      # must stay off. Skipped on fork PRs, which can't read SONAR_TOKEN, and until the
+      # SONAR_ORGANIZATION repository variable is set: the organization key is not committed.
       - name: SonarCloud scan
-        if: ${{ env.SONAR_TOKEN != '' }}
+        if: ${{ env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' }}
         uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4  # v8.2.2
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
           SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          args: -Dsonar.organization=${{ env.SONAR_ORGANIZATION }}
 
   lint-workflows:
     name: Lint workflows (actionlint, zizmor)

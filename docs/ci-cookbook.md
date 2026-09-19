@@ -797,6 +797,12 @@ sonar.python.coverage.reportPaths=coverage.xml
 sonar.python.xunit.reportPath=junit.xml
 ```
 
+If the organization key should not live in the repository, leave `sonar.organization` out of this
+file and pass it from a repository variable instead: set `SONAR_ORGANIZATION` under **Settings →
+Secrets and variables → Actions → Variables**, and give the scan step `args:
+-Dsonar.organization=${{ env.SONAR_ORGANIZATION }}` with `SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}`
+in its `env:`. A variable is not a secret, but it is not published with the repository either.
+
 For a JS/TS project, replace the two `sonar.python.*` lines with
 `sonar.javascript.lcov.reportPaths=path/to/lcov.info` (accepts a comma-separated list for a
 monorepo with several workspaces). `sonar.sources` and `sonar.tests` never accept wildcards, under
