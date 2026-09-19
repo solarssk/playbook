@@ -155,11 +155,16 @@ async function checkPlaybookVersion() {
     if (!response.ok) throw new Error(`GET releases/latest: ${response.status}`);
     const latest = await response.json();
     const latestParts = parseVersion(latest.tag_name);
-    if (!latestParts) throw new Error(`unrecognised tag name "${latest.tag_name}"`);
+    if (!latestParts) throw new Error("latest release tag is not in vX.Y.Z form");
 
     if (isNewer(latestParts, currentParts)) {
-      const detail = `This repo is pinned to playbook ${current}; ${latest.tag_name} is available. ` +
-        `Read the release notes (${latest.html_url}), apply any "Adopter action" items, then bump the pin in the verify-standard workflow.`;
+      // Built only from parsed numbers and a fixed URL prefix, never from raw
+      // API text: this string reaches stdout, where GitHub interprets `::`
+      // lines as workflow commands, so nothing from the response may be echoed.
+      const pinnedTag = `v${currentParts.join(".")}`;
+      const latestTag = `v${latestParts.join(".")}`;
+      const detail = `This repo is pinned to playbook ${pinnedTag}; ${latestTag} is available. ` +
+        `Read the release notes (https://github.com/solarssk/playbook/releases/tag/${latestTag}), apply any "Adopter action" items, then bump the pin in the verify-standard workflow.`;
       record(0, "playbook-version", label, "warn", detail);
       console.log(`::warning title=Newer playbook release available::${detail}`);
     } else {
