@@ -100,13 +100,16 @@ warns until one is linked; it cannot check the level.
 
 - Recipe defects listed under "Adopter action": the section 7 injection, the section 3 pinning and
   permissions, the three section 12b gaps, and the issue template's `triage` label.
-- **`verify-tier` security fixes, found by CodeQL.** Its summary table escaped `|` but not `\`, so a
-  trailing backslash could break out of a cell. Text returned by the GitHub API (required check
-  names, a status) was written into the step summary unfiltered; it now passes an allowlist that
-  drops every character Markdown or HTML acts on. And the playbook checkout's `ref:` in
-  `verify-tier.yml` is a literal, not an expression, which `release-check` keeps equal to
-  `PLAYBOOK_RELEASE`. These run in every repository that calls `verify-tier.yml`, so callers should
-  bump to this release.
+- **`verify-tier` security fixes, found by CodeQL and SonarCloud.** Its summary table escaped `|`
+  but not `\`, so a trailing backslash could break out of a cell. Text returned by the GitHub API
+  (required check names, a status, an error) is no longer written to the step-summary file at all:
+  the file holds only text the script wrote itself, and the API detail goes to the job log, filtered
+  through an allowlist that drops every character Markdown or HTML acts on. The repository name,
+  which comes from the environment, is validated before it is used in a request path, and branch
+  protection is read with a GraphQL query to a fixed URL, so no branch name from a response is put
+  into a path. And the playbook checkout's `ref:` in `verify-tier.yml` is a literal, not an
+  expression, which `release-check` keeps equal to `PLAYBOOK_RELEASE`. These run in every
+  repository that calls `verify-tier.yml`, so callers should bump to this release.
 - `verify-tier` read `uses:` lines inside YAML comments as real steps, read a `Tier: N` line quoted
   in a fenced code block as the repository's own declaration, and expected a `concurrency:` block on
   a reusable-only workflow. Fenced blocks are read as CommonMark defines them.
