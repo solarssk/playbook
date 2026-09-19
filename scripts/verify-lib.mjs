@@ -47,17 +47,31 @@ export function detectDeclaredTier(markdown) {
   return match ? Number(match[1]) : null;
 }
 
+// The fence run (three or more backticks or tildes) if `line` is a fence line, else
+// null. CommonMark allows at most three spaces of indentation: four spaces or a tab
+// makes the line indented code, not a fence. And the info string of a backtick
+// fence may not itself contain a backtick.
+function fenceRun(line) {
+  const match = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+  if (match === null) return null;
+  const [, run, rest] = match;
+  return run.startsWith("`") && rest.includes("`") ? null : run;
+}
+
 // Removes fenced code blocks, line by line, following CommonMark: a block opens on
-// a run of three or more backticks or tildes (indented or not, as under a list
-// item) and closes only on a line holding nothing but a run of the same character
-// at least as long. So a four-backtick fence can display a three-backtick example
-// without the inner line closing it. (A single regex over the whole document
-// backtracks super-linearly on an unterminated fence; a line scan does not.)
+// a run of three or more backticks or tildes and closes only on a line holding
+// nothing but a run of the same character at least as long. So a four-backtick
+// fence can display a three-backtick example without the inner line closing it.
+// Only fences at column 0 to 3 count. A fence nested deeper (under a list item)
+// holds lines that are themselves indented, and this is used to find a
+// column-0 `Tier:` line, so nothing inside one could match anyway. (A single
+// regex over the whole document backtracks super-linearly on an unterminated
+// fence; a line scan does not.)
 export function stripFencedBlocks(markdown) {
   const kept = [];
   let open = null;
   for (const line of markdown.split("\n")) {
-    const run = /^\s*(`{3,}|~{3,})/.exec(line)?.[1] ?? null;
+    const run = fenceRun(line);
     if (open === null) {
       if (run === null) kept.push(line);
       else open = { char: run[0], length: run.length };

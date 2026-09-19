@@ -210,3 +210,25 @@ test("stripFencedBlocks is not closed by a different fence character or by a lin
   assert.equal(stripFencedBlocks("a\n```\nx\n``` not a close\ny\n```\nb"), "a\nb");
   assert.equal(stripFencedBlocks("a\n~~~~\nx\n~~~\ny\n~~~~\nb"), "a\nb");
 });
+
+test("four spaces or a tab make indented code, not a fence, so a real declaration is kept", () => {
+  assert.equal(detectDeclaredTier("    ```\nTier: 2\n"), 2);
+  assert.equal(detectDeclaredTier("\t```\nTier: 2\n"), 2);
+  assert.equal(stripFencedBlocks("a\n    ```\nb"), "a\n    ```\nb");
+});
+
+test("three spaces of indentation still open a fence", () => {
+  assert.equal(stripFencedBlocks("a\n   ```\nx\n   ```\nb"), "a\nb");
+});
+
+test("a backtick fence whose info string contains a backtick is not a fence", () => {
+  assert.equal(detectDeclaredTier("``` a`b\nTier: 2\n"), 2);
+  assert.equal(stripFencedBlocks("``` `x`\nkept"), "``` `x`\nkept");
+  // Tildes have no such restriction.
+  assert.equal(stripFencedBlocks("a\n~~~ a`b\nx\n~~~\nb"), "a\nb");
+});
+
+test("a closing fence indented four spaces does not close the block", () => {
+  assert.equal(stripFencedBlocks("a\n```\nx\n    ```\nstill inside\n```\nb"), "a\nb");
+  assert.equal(stripFencedBlocks("a\n```\nx\n    ```\nnever closed"), "a");
+});

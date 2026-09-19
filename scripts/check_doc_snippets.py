@@ -21,7 +21,9 @@ from dataclasses import dataclass, field
 
 import yaml
 
-FENCE_OPEN = re.compile(r"^([ \t]*)(`{3,}|~{3,})[ \t]*([^\s`]*)")
+# Indentation is accepted at any depth here, unlike in verify-lib: this scanner validates examples
+# nested under list items, whose fences are indented to the item's content.
+FENCE_OPEN = re.compile(r"^([ \t]*)(`{3,}|~{3,})[ \t]*([^\s`]*)(.*)$")
 FENCE_CLOSE = re.compile(r"^[ \t]*(`{3,}|~{3,})[ \t]*$")
 CHECKED_LANGUAGES = {"yaml", "yml", "json"}
 SKIP_DIRS = {".git", "node_modules", ".snippet-workflows"}
@@ -50,7 +52,8 @@ def iter_fences(text: str):
     for number, line in enumerate(text.splitlines(), start=1):
         if fence is None:
             opened = FENCE_OPEN.match(line)
-            if opened:
+            # The info string of a backtick fence may not contain a backtick.
+            if opened and not (opened.group(2).startswith("`") and "`" in opened.group(4)):
                 fence = Fence(opened.group(1), opened.group(2), opened.group(3).lower(), number)
         elif fence.closed_by(line):
             yield fence
