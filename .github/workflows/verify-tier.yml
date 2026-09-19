@@ -63,7 +63,7 @@ env:
   # literal `ref:` of the playbook checkout below. Both name the release this job
   # checks itself out at, independent of whatever ref the caller used;
   # scripts/release-check.mjs fails if they differ.
-  PLAYBOOK_RELEASE: v0.1.1
+  PLAYBOOK_RELEASE: v0.2.0
 
 jobs:
   verify:
@@ -78,7 +78,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: solarssk/playbook
-          ref: v0.1.1 # a literal, not ${{ env.PLAYBOOK_RELEASE }}; release-check keeps the two equal
+          ref: v0.2.0 # a literal, not ${{ env.PLAYBOOK_RELEASE }}; release-check keeps the two equal
           path: .playbook-tools
           persist-credentials: false
           sparse-checkout: |
