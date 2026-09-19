@@ -14,7 +14,7 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 
 - `docs/openssf.md`: OpenSSF Scorecard and Best Practices badge. Tier 2 gains a report-only
   Scorecard workflow (public repositories) and its badge; Tier 3 gains the Best Practices badge
-  at the passing level. Includes a copy-paste workflow, how to read the score (which checks
+  at the passing level (with a `verify-tier` warning when no badge is linked). Includes a copy-paste workflow, how to read the score (which checks
   map to existing standard items versus which measure team size, such as Code-Review), and an
   explicit rule that neither is a merge gate and no control is added only to move a score.
   Derived from a Tier 3 repository already running both.
@@ -87,8 +87,8 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   `dependabot.yml`, so a new release arrives as a pull request. Bump the pinned SHA when it does.
 - **Tier 2 and above, public repositories:** add the OpenSSF Scorecard workflow from
   `docs/openssf.md` and, once it has run, its README badge. `verify-tier` warns until it exists.
-- **Tier 3:** reach the OpenSSF Best Practices badge at the passing level. Not checked
-  automatically.
+- **Tier 3:** reach the OpenSSF Best Practices badge at the passing level and link it from the
+  README. `verify-tier` warns until a bestpractices.dev badge is linked; it cannot check the level.
 - **DeepWiki:** nothing required. Optional, see `docs/deepwiki.md`.
 
 ## [0.1.2] - 2026-09-08

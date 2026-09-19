@@ -172,6 +172,11 @@ Rules for filling it in:
 
 `<project-id>` is the numeric ID assigned when the project is registered on bestpractices.dev.
 
+`verify-tier` warns at Tier 3 when no bestpractices.dev project badge is linked from the README.
+It cannot tell which level the badge shows, so reaching *passing* stays the maintainer's claim
+to keep honest. This requirement is for the repositories that follow the standard; the playbook
+itself is Tier 2 and does not carry the badge.
+
 ## Security Baseline (OSPS)
 
 The [OpenSSF Security Baseline](https://baseline.openssf.org) is a third instrument, closer in

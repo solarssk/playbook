@@ -208,6 +208,10 @@ function checkTier3() {
 
   const changelog = readIfExists("CHANGELOG.md") ?? "";
   const versionHeadings = (changelog.match(/^##\s*\[\d+\.\d+\.\d+\]/gm) ?? []).length;
+  const readme = readIfExists("README.md") ?? "";
+  record(3, "best-practices-badge", "OpenSSF Best Practices badge linked from the README", /bestpractices\.dev\/projects\/\d+/.test(readme) ? "pass" : "warn",
+    "No bestpractices.dev project badge found in README.md. Tier 3 asks for the passing level; see docs/openssf.md. This only checks that a badge is linked, not which level it shows.");
+
   record(3, "per-version-changelog", "CHANGELOG has per-version entries", versionHeadings >= 1 ? "pass" : "warn",
     `Found ${versionHeadings} version heading(s) in CHANGELOG.md.`);
 }
