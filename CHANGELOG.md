@@ -56,6 +56,13 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   where this standard deliberately differs.
 - `docs/tiers.md`, question 2: a reusable workflow, action, or script that other repositories run
   counts as blast radius beyond the owner, whatever its size.
+- `docs/tiers.md` gains an "At a glance" table: every requirement by tier, and the `verify-tier`
+  check that covers it (or `manual`). A unit test keeps the table and `scripts/verify-tier.mjs` in
+  agreement on both the set of checks and the tier each starts at. The per-tier sections gain the
+  items that were only stated elsewhere: workflow hygiene (Tier 1), Dependabot `cooldown`, standard
+  `type:` labels and a milestone per release, and a signed provenance attestation on a consumed
+  repository's Releases (Tier 2), and the required-check-name rule moves to Tier 0, where the
+  script already had it.
 
 ### Fixed
 
@@ -74,6 +81,9 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   declaration. Fenced blocks are now ignored.
 - `verify-tier` no longer expects a `concurrency:` block on a reusable-only workflow, which takes
   it from its caller.
+- The issue templates applied a `triage` label that the standard's taxonomy does not define and that
+  did not exist in the repository, so GitHub dropped it silently. Removed from
+  `templates/ISSUE_TEMPLATE/bug.yml`.
 - `templates/pull_request_template.md` offered "No doc update needed (explain why)", which the
   documentation-impact check in section 12 does not accept. It now reads
   "No doc update needed: <state the reason>".
@@ -85,6 +95,12 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   downloaded binary's checksum. This is a real injection path, not a style point.
 - **Tier 2 and above:** add `actionlint` and `zizmor` to CI (section 15), and a `cooldown` to each
   `dependabot.yml` entry. `verify-tier` warns until the linters exist.
+- **Tier 2 and above:** use the standard `type:` labels (`docs/governance.md`) and a milestone per
+  release. Neither is checked automatically.
+- **All tiers:** untrusted context values reach the shell through `env:`, and downloaded binaries
+  are checksum-verified (`docs/tiers.md`, Tier 1). `zizmor` at Tier 2 catches the first.
+- **Anyone who copied the issue template:** remove `labels: ["triage"]` unless you created that
+  label.
 - **Anyone who copied the section 3 osv-scanner workflow:** pin the two `uses:` lines to a commit
   SHA and move `security-events: write` from the top of the file to those two jobs.
 - **All tiers with branch protection:** confirm each required status check is copied from the

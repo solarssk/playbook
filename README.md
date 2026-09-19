@@ -85,7 +85,7 @@ below to go straight to the document you need.
 | Document | Covers |
 |---|---|
 | [AGENTS.md](AGENTS.md) | The full standard and adoption workflow, written for AI coding agents. Read natively by Cursor and other AGENTS.md-adopting agent tools; Claude Code reads it through a one-line `CLAUDE.md` stub instead of a second, duplicated file. |
-| [docs/tiers.md](docs/tiers.md) | The four-tier system itself: how to pick a tier, and each tier's checklist. Start here for "what does my repo actually need." |
+| [docs/tiers.md](docs/tiers.md) | The four-tier system itself: how to pick a tier, an "At a glance" table of every requirement by tier, and each tier's checklist. Start here for "what does my repo actually need." |
 | [docs/readme-standard.md](docs/readme-standard.md) | How a README should be structured, section by section, per tier. This README follows it. |
 | [docs/ci-cookbook.md](docs/ci-cookbook.md) | Copy-paste CI recipes: SHA-pinning actions, concurrency groups, CodeQL, Semgrep, gitleaks, Dependabot, container scanning, Codecov, SonarCloud. |
 | [docs/openssf.md](docs/openssf.md) | OpenSSF Scorecard workflow and the Best Practices badge: which tier each belongs to, how to read the score, and what not to chase. |

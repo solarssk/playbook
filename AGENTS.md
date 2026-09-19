@@ -26,7 +26,8 @@ asked to bring it in line with this standard, or to check whether it already is.
    repo (what does it ship, who depends on it, does it handle another party's data) and pick the
    lowest tier that's honestly still correct. When genuinely unsure, undershoot.
 2. **Read that tier's checklist** in [docs/tiers.md](docs/tiers.md), remembering it's additive.
-   Tier 2 means Tier 0 plus Tier 1 plus Tier 2's own list.
+   Tier 2 means Tier 0 plus Tier 1 plus Tier 2's own list. Start from its "At a glance" table:
+   every requirement, by tier, and which `verify-tier` check covers it.
 3. **Check what's actually already there before proposing changes.** Read the real files and the
    real repository settings (`gh api repos/<owner>/<repo>`, `gh api
    repos/<owner>/<repo>/branches/<default>/protection`). Don't infer compliance from a README

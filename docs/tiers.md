@@ -13,6 +13,7 @@ property of what it *is* (its blast radius, its audience, what it ships), not of
 existed or how much anyone likes it.
 
 - [How to pick a tier](#how-to-pick-a-tier)
+- [At a glance](#at-a-glance)
 - [Tier 0: every repository](#tier-0-every-repository)
 - [Tier 1: small, single-purpose tools](#tier-1-small-single-purpose-tools)
 - [Tier 2: public tools with real dependents](#tier-2-public-tools-with-real-dependents)
@@ -43,6 +44,59 @@ scope grows. It's expensive to maintain SAST/SBOM/DAST machinery nobody looks at
 that never grew into needing it. A pile of unread security-scan artifacts is not a security
 posture.
 
+## At a glance
+
+Every requirement, by tier. `✓` means required at that tier and every tier above it (the tiers are
+additive). `if ...` means required only when the condition holds. `opt` means optional, never
+required. The last column names the `verify-tier` check that covers it; `manual` means no automatic
+check exists and a reviewer has to look. A unit test keeps this table and
+`scripts/verify-tier.mjs` in agreement, so a check cannot be added, moved, or dropped in one
+without the other.
+
+| Requirement | 0 | 1 | 2 | 3 | verify-tier |
+|---|---|---|---|---|---|
+| `LICENSE` file that matches the README | ✓ | ✓ | ✓ | ✓ | `license` |
+| `.github/CODEOWNERS` | ✓ | ✓ | ✓ | ✓ | `codeowners` |
+| README opens with what and why | ✓ | ✓ | ✓ | ✓ | `readme-opens-well` (warns, needs a human) |
+| Dependabot security updates on (setting) | ✓ | ✓ | ✓ | ✓ | `dependabot-security-updates` (admin token) |
+| Delete head branches on merge (setting) | ✓ | ✓ | ✓ | ✓ | `delete-branch-on-merge` (admin token) |
+| Branch protection on the default branch | ✓ | ✓ | ✓ | ✓ | `branch-protection` (admin token) |
+| Required status checks match the names jobs report | ✓ | ✓ | ✓ | ✓ | `required-check-names` (admin token) |
+| Pinned to the latest playbook release | if calling `verify-tier` | if calling `verify-tier` | if calling `verify-tier` | if calling `verify-tier` | `playbook-version` |
+| Minimal CI (lint plus build or syntax check) | | ✓ | ✓ | ✓ | `ci-exists` |
+| Actions pinned to a commit SHA | | ✓ | ✓ | ✓ | `sha-pinned` |
+| Least-privilege `permissions:` | | ✓ | ✓ | ✓ | `permissions-block` |
+| Workflow hygiene: untrusted values reach the shell through `env:`, downloads are checksum-verified | | ✓ | ✓ | ✓ | manual (`zizmor` at Tier 2) |
+| Dependency vulnerability audit in CI | | ✓ | ✓ | ✓ | `dependency-audit` |
+| Dependencies pinned in the manifest | | ✓ | ✓ | ✓ | manual |
+| Secret scan in CI | | ✓ | ✓ | ✓ | `secret-scan` |
+| `SECURITY.md` with private reporting | | ✓ | ✓ | ✓ | `security-md` |
+| One structured issue template | | ✓ | ✓ | ✓ | `issue-template` |
+| Tests and type checks in CI | | | ✓ | ✓ | manual |
+| SAST (CodeQL and/or Semgrep) | | | ✓ | ✓ | `sast` |
+| Workflows linted (actionlint and zizmor) | | | ✓ | ✓ | `workflow-lint` |
+| Dependabot on every ecosystem in use, with a cooldown | | | ✓ | ✓ | manual |
+| Container image scanned before it is pushed | | | if it publishes an image | if it publishes an image | manual |
+| SBOM for a published image | | | if it publishes an image | if it publishes an image | manual |
+| `concurrency:` on every workflow | | | ✓ | ✓ | `concurrency` |
+| `CONTRIBUTING.md` | | | ✓ | ✓ | `contributing` |
+| Pull request template | | | ✓ | ✓ | `pr-template` |
+| Documentation impact section, checked in CI | | | ✓ | ✓ | `docs-impact-section` |
+| README badge row | | | ✓ | ✓ | `readme-badges` |
+| OpenSSF Scorecard workflow, report-only | | | if public | if public | `scorecard` |
+| A GitHub Release per version, with an "Adopter action" list | | | if others consume it | if others consume it | manual |
+| `type:` labels, and a milestone per release | | | ✓ | ✓ | manual |
+| DAST against a running instance | | | | ✓ | `dast` |
+| Coverage gate and code-quality gate | | | | ✓ | `coverage-or-quality-gate` |
+| User-facing wiki synced from the repository | | | | ✓ | manual |
+| Auditor-facing security documentation | | | | ✓ | manual |
+| Per-version release notes | | | | ✓ | `per-version-changelog` |
+| OpenSSF Best Practices badge, passing level | | | | ✓ | `best-practices-badge` |
+| DeepWiki index of a public repository | | | opt | opt | manual, never required |
+
+The sections below say why each item exists and how to meet it. Nothing is required at a tier that
+this table does not list, and nothing is listed here that the sections below do not explain.
+
 ## Tier 0: every repository
 
 Applies to all repositories without exception, including empty or placeholder ones. These are
@@ -64,7 +118,9 @@ repo-settings toggles and file hygiene: near-zero effort, no CI required.
       own status checks to pass before merge. Required PR review count can reasonably stay at 0
       for a solo-maintained repository (there's no one to require review from), but that should
       be a deliberate choice, revisited the moment a second person gets write access, not a
-      permanent default.
+      permanent default. Each required check is the name a job actually reports, copied from the
+      Checks tab of a real pull request: a name that no job reports never arrives, and every pull
+      request then stays blocked with no error. See [governance.md](governance.md#branch-protection).
 - [ ] The README opens with what the project is and why it exists, before any setup instructions.
       See [readme-standard.md](readme-standard.md).
 
@@ -84,6 +140,11 @@ external users. Everything in Tier 0, plus:
       in doubt.
 - [ ] Explicit least-privilege `permissions:` block (`contents: read` unless a job genuinely needs
       more).
+- [ ] Workflow hygiene. Context values an outsider can influence (a branch name, a PR title) reach
+      the shell through `env:`, never through `${{ }}` inside a `run:` block, where they become
+      code. A binary downloaded in CI is verified against a checksum before it runs, over HTTPS
+      only. See [ci-cookbook.md](ci-cookbook.md#7-gitleaks-ci-secret-scanning-not-a-replacement-for-platform-scanning)
+      for both in a working recipe. Tier 2's workflow linter checks the first automatically.
 - [ ] A dependency vulnerability audit (`pip-audit`, `npm audit`, `osv-scanner`, or the
       equivalent) as a CI step, not just the passive Dependabot alert from Tier 0. See
       [ci-cookbook.md](ci-cookbook.md#3-dependency-vulnerability-audit-pip-audit-npm-audit-osv-scanner).
@@ -123,7 +184,9 @@ handles credentials or PII. Everything in Tier 1, plus:
       [ci-cookbook.md](ci-cookbook.md#15-linting-workflows-actionlint-and-zizmor).
 - [ ] Dependabot covering *every* ecosystem actually in use: application dependencies,
       `github-actions`, and any Docker base image(s), including a deploy/compose stack's images
-      when those are separate from the application's own `Dockerfile`. This is the single most
+      when those are separate from the application's own `Dockerfile`. Every entry carries a
+      `cooldown`, so a version published minutes ago is not proposed before it has had time to be
+      pulled if compromised. See [ci-cookbook.md](ci-cookbook.md#4-dependabot-one-file-every-ecosystem). This is the single most
       common gap this scheme's originating audit found: a repo watching its own `Dockerfile` but
       not the Postgres, Redis, or nginx images its compose stack actually runs.
 - [ ] If a container image is published, a vulnerability scan (Trivy or equivalent) of the
@@ -143,8 +206,9 @@ handles credentials or PII. Everything in Tier 1, plus:
 - [ ] `CONTRIBUTING.md`, a pull request template, and CODEOWNERS.
 - [ ] If other repositories consume it (a reusable workflow, an action, a template set): a
       GitHub Release per version, not just a tag, with notes that say what a repository already
-      following it must change (an "Adopter action" list). The Release is what adopters and
-      Dependabot are notified by; a bare tag notifies no one. See
+      following it must change (an "Adopter action" list), a source archive with a checksums file,
+      and a signed build provenance attestation. The Release is what adopters and Dependabot are
+      notified by; a bare tag notifies no one. See
       [ci-cookbook.md](ci-cookbook.md#13-verifying-a-repo-against-this-standard-automatically).
 - [ ] A "Documentation impact" section in the PR template, checked in CI against the actual diff
       rather than trusted on its word. See
@@ -152,7 +216,11 @@ handles credentials or PII. Everything in Tier 1, plus:
       Cheap, doesn't need a Wiki, and catches the specific, recurring failure mode of a PR
       changing something a doc describes without anyone remembering to update the doc.
 - [ ] Branch protection actually enforced: required status checks that are genuinely required,
-      not merely present as unenforced workflow files.
+      not merely present as unenforced workflow files, and the list is kept current as jobs are
+      added or renamed.
+- [ ] Issues and pull requests carry the standard `type:` labels, and a milestone groups the work
+      for each release once the repository cuts versions. Start lean; see
+      [governance.md](governance.md#labels-and-milestones).
 - [ ] A README badge row: CI status, license, latest release, and container platforms if
       applicable.
 - [ ] On public repositories, an OpenSSF Scorecard workflow, report-only, plus its badge once the
