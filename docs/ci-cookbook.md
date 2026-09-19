@@ -228,6 +228,7 @@ jobs:
   scan-pr:
     if: github.event_name == 'pull_request'
     permissions:
+      actions: read # the called workflow declares it; a caller cannot grant less than that
       contents: read
       security-events: write # upload SARIF; granted to this job only
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67  # v2.5.1
@@ -235,6 +236,7 @@ jobs:
   scan-scheduled:
     if: github.event_name == 'schedule'
     permissions:
+      actions: read # the called workflow declares it; a caller cannot grant less than that
       contents: read
       security-events: write # upload SARIF; granted to this job only
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67  # v2.5.1
@@ -244,7 +246,9 @@ Pinned to a commit SHA like every other `uses:` (§1), including a reusable work
 moved, a SHA cannot. Use the SHA of whatever the project's current release is when you adopt this
 (check its own releases page), and keep it fresh via Dependabot's `github-actions` ecosystem
 (§4). `security-events: write` sits on the two jobs that upload SARIF, not at the top of the file,
-so nothing else in the workflow inherits it.
+so nothing else in the workflow inherits it. A reusable workflow can only be granted what the
+caller allows, and this one declares `actions: read` as well, so a caller that grants less fails
+at startup with no log (`startup_failure`), not with a permissions error.
 
 **Avoiding the "permanently red" failure mode:** a real known-unfixable transitive CVE (no patched
 version published yet) will otherwise block every unrelated PR indefinitely, which is exactly how

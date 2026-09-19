@@ -18,6 +18,7 @@ jobs:
   scan-pr:
     if: github.event_name == 'pull_request'
     permissions:
+      actions: read # the called workflow declares it; a caller cannot grant less than that
       contents: read
       security-events: write # upload SARIF; granted to this job only
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67  # v2.5.1
@@ -25,6 +26,7 @@ jobs:
   scan-scheduled:
     if: github.event_name == 'schedule'
     permissions:
+      actions: read # the called workflow declares it; a caller cannot grant less than that
       contents: read
       security-events: write # upload SARIF; granted to this job only
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67  # v2.5.1
