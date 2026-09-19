@@ -3,7 +3,6 @@ import { test } from "node:test";
 
 import {
   detectDeclaredTier,
-  encodeBranchName,
   escapeTableCell,
   extractChangelogSection,
   findFloatingActionRefs,
@@ -291,13 +290,5 @@ test("parseRepoSlug accepts owner/repository and nothing that could change a req
   assert.deepEqual(parseRepoSlug("a.b-c_d/e.f"), { owner: "a.b-c_d", repo: "e.f" });
   for (const bad of ["", "owner", "o/r/extra", "../x", "o/..", "./r", "o/", "/r", "o r/x", "o/r?x=1", "o/r#f", "o/%2e%2e", undefined, null]) {
     assert.equal(parseRepoSlug(bad), null, `should reject ${JSON.stringify(bad)}`);
-  }
-});
-
-test("encodeBranchName encodes a plain branch name and rejects anything else", () => {
-  assert.equal(encodeBranchName("main"), "main");
-  assert.equal(encodeBranchName("release/1.2"), "release%2F1.2");
-  for (const bad of ["", "../x", "a//b", "a/./b", "/lead", "trail/", "a b", "a?b", "a#b", "%2e%2e", "x".repeat(256), 5, null, undefined]) {
-    assert.equal(encodeBranchName(bad), null, `should reject ${JSON.stringify(bad)}`);
   }
 });

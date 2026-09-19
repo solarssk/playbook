@@ -253,11 +253,3 @@ export function parseRepoSlug(value) {
   const plain = (part) => part.length > 0 && part.length <= 100 && part !== "." && part !== ".." && /^[A-Za-z0-9_.-]+$/.test(part);
   return parts.length === 2 && parts.every(plain) ? { owner: parts[0], repo: parts[1] } : null;
 }
-
-// A branch name made safe to put in a request path, or null when it is not a plain branch name
-// (empty, too long, an empty or dot-only segment, or a character outside the usual set).
-export function encodeBranchName(name) {
-  if (typeof name !== "string" || name === "" || name.length > 255) return null;
-  const plain = (part) => part !== "" && part !== "." && part !== ".." && /^[A-Za-z0-9_.-]+$/.test(part);
-  return name.split("/").every(plain) ? encodeURIComponent(name) : null;
-}

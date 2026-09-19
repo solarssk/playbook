@@ -13,7 +13,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { detectDeclaredTier as tierFromMarkdown, escapeTableCell, findFloatingActionRefs, isNewer, encodeBranchName, isReusableOnly, parseRepoSlug, parseVersion, unmatchedRequiredContexts, untrustedText } from "./verify-lib.mjs";
+import { detectDeclaredTier as tierFromMarkdown, escapeTableCell, findFloatingActionRefs, isNewer, isReusableOnly, parseRepoSlug, parseVersion, unmatchedRequiredContexts, untrustedText } from "./verify-lib.mjs";
 
 const repoRoot = process.cwd();
 const results = []; // { tier, id, label, status: "pass"|"fail"|"warn"|"skip", detail }
@@ -228,6 +228,55 @@ function checkTier3() {
 
 // ---------- settings-level checks (need an admin-scoped token) ----------
 
+function checkRepository(repo) {
+  record(0, "delete-branch-on-merge", "Automatically delete head branches enabled",
+    repo.delete_branch_on_merge ? "pass" : "warn",
+    repo.delete_branch_on_merge ? "" : "delete_branch_on_merge is false. This can be a deliberate choice (see docs/tiers.md, Tier 0); confirm it's documented if so.");
+
+  const status = repo.security_and_analysis?.dependabot_security_updates?.status;
+  if (!status) {
+    record(0, "dependabot-security-updates", "Dependabot security updates enabled", "warn",
+      "security_and_analysis not present in the response (needs org owner/security-manager access, not just repo admin, in some org configurations).");
+    return;
+  }
+  record(0, "dependabot-security-updates", "Dependabot security updates enabled", status === "enabled" ? "pass" : "warn",
+    "Dependabot security updates are not enabled. The job log has the reported status.", `Status: ${untrustedText(status)}.`);
+}
+
+// The required status checks of the default branch's protection rule, or null when there is none.
+// A GraphQL query to a fixed URL resolves the default branch on GitHub's side, so no branch name
+// from a response is ever put into a request path.
+async function requiredStatusChecks(slug, headers) {
+  const query = "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){defaultBranchRef{branchProtectionRule{requiredStatusCheckContexts}}}}";
+  const response = await fetch("https://api.github.com/graphql", {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables: { owner: slug.owner, name: slug.repo } }),
+  });
+  if (!response.ok) throw new Error(`POST graphql: ${response.status}`);
+  const payload = await response.json();
+  if (payload.errors) throw new Error("the branch protection query returned errors");
+  const rule = payload.data?.repository?.defaultBranchRef?.branchProtectionRule;
+  return rule ? (rule.requiredStatusCheckContexts ?? []) : null;
+}
+
+function checkProtection(contexts) {
+  if (contexts === null) {
+    record(0, "branch-protection", "Branch protection enabled on the default branch", "warn",
+      "No branch protection configured on the default branch.");
+    return;
+  }
+  record(0, "branch-protection", "Branch protection enabled on the default branch", "pass");
+
+  const unmatched = unmatchedRequiredContexts(contexts, listWorkflowFiles().map((file) => readFileSync(file, "utf8")));
+  const why = "A required check that never reports blocks every pull request with no error. " +
+    "A context posted by an external app (SonarCloud, for example) is expected here; a mistyped job name is not. See docs/governance.md, branch protection.";
+  record(0, "required-check-names", "Every required status check matches a workflow job's reported name",
+    unmatched.length === 0 ? "pass" : "warn",
+    `Some required status checks match no workflow job's reported name. The job log lists them. ${why}`,
+    `No workflow job reports as: ${unmatched.map((context) => untrustedText(context)).join(", ")}. ${why}`);
+}
+
 async function checkSettings(token) {
   if (!token) {
     record(0, "settings", "Repo-settings checks (delete-branch-on-merge, Dependabot, branch protection)", "skip",
@@ -236,50 +285,14 @@ async function checkSettings(token) {
   }
   const headers = { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" };
   try {
-    // The host is fixed, and both parts of the path are validated before they are used: the
-    // repository comes from the environment and the branch name from an API response.
+    // The host is fixed and the repository name, which comes from the environment, is validated
+    // before it is used in the path.
     const slug = parseRepoSlug(process.env.GITHUB_REPOSITORY);
     if (slug === null) throw new Error("GITHUB_REPOSITORY is not an owner/repository name");
-    const apiBase = `https://api.github.com/repos/${slug.owner}/${slug.repo}`;
-
-    const repoResponse = await fetch(apiBase, { headers });
+    const repoResponse = await fetch(`https://api.github.com/repos/${slug.owner}/${slug.repo}`, { headers });
     if (!repoResponse.ok) throw new Error(`GET /repos/${slug.owner}/${slug.repo}: ${repoResponse.status}`);
-    const repo = await repoResponse.json();
-
-    record(0, "delete-branch-on-merge", "Automatically delete head branches enabled",
-      repo.delete_branch_on_merge ? "pass" : "warn",
-      repo.delete_branch_on_merge ? "" : "delete_branch_on_merge is false. This can be a deliberate choice (see docs/tiers.md, Tier 0); confirm it's documented if so.");
-
-    const dependabotStatus = repo.security_and_analysis?.dependabot_security_updates?.status;
-    if (dependabotStatus) {
-      record(0, "dependabot-security-updates", "Dependabot security updates enabled", dependabotStatus === "enabled" ? "pass" : "warn",
-        "Dependabot security updates are not enabled. The job log has the reported status.", `Status: ${untrustedText(dependabotStatus)}.`);
-    } else {
-      record(0, "dependabot-security-updates", "Dependabot security updates enabled", "warn",
-        "security_and_analysis not present in the response (needs org owner/security-manager access, not just repo admin, in some org configurations).");
-    }
-
-    const branch = encodeBranchName(repo.default_branch);
-    if (branch === null) throw new Error("the default branch name is not a plain branch name");
-    const protectionResponse = await fetch(`${apiBase}/branches/${branch}/protection`, { headers });
-    if (protectionResponse.status === 404) {
-      record(0, "branch-protection", "Branch protection enabled on the default branch", "warn",
-        "No branch protection configured on the default branch.");
-    } else if (protectionResponse.ok) {
-      const protection = await protectionResponse.json();
-      const contexts = protection.required_status_checks?.contexts ?? [];
-      record(0, "branch-protection", "Branch protection enabled on the default branch", "pass");
-
-      const unmatched = unmatchedRequiredContexts(contexts, listWorkflowFiles().map((file) => readFileSync(file, "utf8")));
-      const why = "A required check that never reports blocks every pull request with no error. " +
-        "A context posted by an external app (SonarCloud, for example) is expected here; a mistyped job name is not. See docs/governance.md, branch protection.";
-      record(0, "required-check-names", "Every required status check matches a workflow job's reported name",
-        unmatched.length === 0 ? "pass" : "warn",
-        `Some required status checks match no workflow job's reported name. The job log lists them. ${why}`,
-        `No workflow job reports as: ${unmatched.map((context) => untrustedText(context)).join(", ")}. ${why}`);
-    } else {
-      throw new Error(`GET branch protection: ${protectionResponse.status}`);
-    }
+    checkRepository(await repoResponse.json());
+    checkProtection(await requiredStatusChecks(slug, headers));
   } catch (error) {
     record(0, "settings", "Repo-settings checks", "warn", "Could not complete the repo-settings checks. The job log has the reason.",
       `Could not complete: ${untrustedText(error.message)}`);
