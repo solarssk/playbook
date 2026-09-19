@@ -217,7 +217,7 @@ export function readDocsImpactDeclaration(body) {
 // Escapes text for one cell of a Markdown table. The backslash goes first: escaping
 // only the pipe leaves a trailing backslash free to cancel the pipe's own escape.
 export function escapeTableCell(text) {
-  return String(text).replaceAll("\\", "\\\\").replaceAll("|", "\\|").replaceAll("\n", " ");
+  return String(text).replaceAll("\\", String.raw`\\`).replaceAll("|", String.raw`\|`).replaceAll("\n", " ");
 }
 
 // Text that came from a network response, made safe to print into a Markdown
