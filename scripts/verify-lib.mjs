@@ -231,13 +231,17 @@ export function untrustedText(value, maxLength = 200) {
 
 // The literal `ref:` of the step that checks out this repository's own scripts in
 // verify-tier.yml, or null. Read as a literal on purpose: an expression there
-// (`${{ env.X }}`) is something static analysis cannot prove constant.
+// (`${{ env.X }}`) is something static analysis cannot prove constant. The step is
+// found by its own boundaries (a `- ` list item at any depth starts the next one),
+// so a `ref:` belonging to a different step never counts, and the key order inside
+// the step's `with:` mapping does not matter.
 export function readPlaybookCheckoutRef(workflowText) {
-  let inPlaybookCheckout = false;
+  const steps = [];
   for (const line of stripYamlComments(workflowText).split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("repository:")) inPlaybookCheckout = unquote(trimmed.slice("repository:".length).trim()) === "solarssk/playbook";
-    else if (inPlaybookCheckout && trimmed.startsWith("ref:")) return unquote(trimmed.slice("ref:".length).trim());
+    if (/^\s*- /.test(line) || steps.length === 0) steps.push([]);
+    steps.at(-1).push(line.trim().replace(/^- /, ""));
   }
-  return null;
+  const checkout = steps.find((step) => step.some((line) => line.startsWith("repository:") && unquote(line.slice("repository:".length).trim()) === "solarssk/playbook"));
+  const ref = checkout?.find((line) => line.startsWith("ref:"));
+  return ref === undefined ? null : unquote(ref.slice("ref:".length).trim());
 }

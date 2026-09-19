@@ -268,3 +268,18 @@ test("readPlaybookCheckoutRef reads the literal ref of the playbook checkout onl
   assert.equal(readPlaybookCheckoutRef("repository: other/repo\nref: v9.9.9\n"), null);
   assert.equal(readPlaybookCheckoutRef("nothing here"), null);
 });
+
+test("readPlaybookCheckoutRef is scoped to the playbook checkout step and ignores key order", () => {
+  const sha = "0123456789012345678901234567890123456789";
+  const refFirst = [`      - uses: actions/checkout@${sha}`, "        with:", "          ref: v0.3.0", "          repository: solarssk/playbook"].join("\n");
+  assert.equal(readPlaybookCheckoutRef(refFirst), "v0.3.0");
+  // The playbook checkout has no ref; a later, unrelated step's ref must not stand in for it.
+  const missing = [
+    `      - uses: actions/checkout@${sha}`, "        with:", "          repository: solarssk/playbook", "          path: .tools",
+    "      - uses: actions/other@v1", "        with:", "          ref: v0.3.0",
+  ].join("\n");
+  assert.equal(readPlaybookCheckoutRef(missing), null);
+  // A ref in an earlier step is not the playbook checkout's either.
+  const earlier = [`      - uses: a/b@${sha}`, "        with:", "          ref: v9.9.9", `      - uses: actions/checkout@${sha}`, "        with:", "          repository: solarssk/playbook"].join("\n");
+  assert.equal(readPlaybookCheckoutRef(earlier), null);
+});
