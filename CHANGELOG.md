@@ -93,8 +93,11 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   repository's copy moved out of `ci.yml` for the same reason.
 - `verify-tier`'s `workflow-lint` check now requires both `actionlint` and `zizmor`, and names the
   missing one; either alone used to pass.
-- `scripts/check_doc_snippets.py` and `verify-tier` now recognise fenced blocks indented under a list
-  item, which were silently skipped. The docs' own indented blocks are now validated.
+- `scripts/check_doc_snippets.py` and `verify-tier` now read Markdown fences as CommonMark defines
+  them: backticks or tildes, three or more, indented under a list item or not, closed only by a run
+  of the same character at least as long. Blocks written any way but three unindented backticks
+  were silently skipped, and a four-backtick block quoting a `Tier: N` example could be read as the
+  document's own declaration. The docs' own indented blocks are now validated.
 - `verify-tier` now treats a workflow as reusable-only only when `workflow_call` is its sole
   trigger, instead of checking for a fixed list of other events, and requires a reusable-workflow
   job's required check to carry its `<caller> / <called job>` suffix. It also reads a quoted

@@ -198,3 +198,15 @@ test("stripFencedBlocks also drops an indented fence, as under a list item", () 
   assert.equal(stripFencedBlocks("a\n   ```markdown\n   Tier: 3\n   ```\nb"), "a\nb");
   assert.equal(detectDeclaredTier("1. step\n\n   ```markdown\n   Tier: 3\n   ```\n\nTier: 1\n"), 1);
 });
+
+test("stripFencedBlocks follows the full delimiter: a longer fence is not closed by a shorter run", () => {
+  const doc = ["a", "````markdown", "```", "Tier: 3", "```", "````", "b"].join("\n");
+  assert.equal(stripFencedBlocks(doc), "a\nb");
+  assert.equal(detectDeclaredTier(`${doc}\nTier: 1\n`), 1);
+});
+
+test("stripFencedBlocks is not closed by a different fence character or by a line with text", () => {
+  assert.equal(stripFencedBlocks("a\n```\nx\n~~~\ny\n```\nb"), "a\nb");
+  assert.equal(stripFencedBlocks("a\n```\nx\n``` not a close\ny\n```\nb"), "a\nb");
+  assert.equal(stripFencedBlocks("a\n~~~~\nx\n~~~\ny\n~~~~\nb"), "a\nb");
+});

@@ -1,7 +1,11 @@
 """Checks the code snippets in the repository's Markdown.
 
 Every fenced `yaml`/`yml` and `json` block must parse: this repository's own rule
-is that a snippet an agent pastes into a real CI file has to be valid.
+is that a snippet an agent pastes into a real CI file has to be valid. Fences are
+read as CommonMark defines them: a run of three or more backticks or tildes opens a
+block (indented, when nested under a list item), and only a line holding a run of
+the same character, at least as long, closes it. Content inside a fence is never
+scanned for further fences, so a four-backtick block can quote a three-backtick one.
 
 With `--extract`, a YAML block that is a complete GitHub Actions workflow (has `on`
 and `jobs`) is also written to `.snippet-workflows/`, so actionlint can check its
@@ -13,13 +17,46 @@ import json
 import pathlib
 import re
 import sys
+from dataclasses import dataclass, field
 
 import yaml
 
-# A fenced block nested under a list item is indented; the closing fence repeats the same indent.
-FENCE = re.compile(r"^([ \t]*)```(yaml|yml|json)[^\n]*\n(.*?)^\1```[ \t]*$", re.MULTILINE | re.DOTALL)
+FENCE_OPEN = re.compile(r"^([ \t]*)(`{3,}|~{3,})[ \t]*([^\s`]*)")
+FENCE_CLOSE = re.compile(r"^[ \t]*(`{3,}|~{3,})[ \t]*$")
+CHECKED_LANGUAGES = {"yaml", "yml", "json"}
 SKIP_DIRS = {".git", "node_modules", ".snippet-workflows"}
 EXTRACT_DIR = pathlib.Path(".snippet-workflows")
+
+
+@dataclass
+class Fence:
+    indent: str
+    marker: str
+    language: str
+    start: int
+    body: list = field(default_factory=list)
+
+    def closed_by(self, line: str) -> bool:
+        closing = FENCE_CLOSE.match(line)
+        return bool(closing) and closing.group(1)[0] == self.marker[0] and len(closing.group(1)) >= len(self.marker)
+
+    def add(self, line: str) -> None:
+        self.body.append(line[len(self.indent):] if line.startswith(self.indent) else line.lstrip())
+
+
+def iter_fences(text: str):
+    """Yield every closed fenced block in a Markdown document."""
+    fence = None
+    for number, line in enumerate(text.splitlines(), start=1):
+        if fence is None:
+            opened = FENCE_OPEN.match(line)
+            if opened:
+                fence = Fence(opened.group(1), opened.group(2), opened.group(3).lower(), number)
+        elif fence.closed_by(line):
+            yield fence
+            fence = None
+        else:
+            fence.add(line)
 
 
 def is_workflow(document) -> bool:
@@ -32,13 +69,9 @@ def iter_snippets():
     for path in sorted(pathlib.Path(".").rglob("*.md")):
         if SKIP_DIRS & set(path.parts):
             continue
-        text = path.read_text(encoding="utf-8")
-        for index, match in enumerate(FENCE.finditer(text)):
-            line = text[: match.start()].count("\n") + 1
-            indent, language, body = match.groups()
-            if indent:
-                body = re.sub(rf"^{re.escape(indent)}", "", body, flags=re.MULTILINE)
-            yield path, line, language, body, index
+        checked = [f for f in iter_fences(path.read_text(encoding="utf-8")) if f.language in CHECKED_LANGUAGES]
+        for index, fence in enumerate(checked):
+            yield path, fence.start, fence.language, "\n".join(fence.body) + "\n", index
 
 
 def parse(language: str, body: str):

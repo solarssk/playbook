@@ -47,21 +47,22 @@ export function detectDeclaredTier(markdown) {
   return match ? Number(match[1]) : null;
 }
 
-// Removes fenced code blocks, line by line. A block opens on a line starting
-// with ``` or ~~~ (indented or not, as under a list item) and closes on the next
-// line that starts with the same marker.
-// (A single regex over the whole document backtracks super-linearly on an
-// unterminated fence; a line scan does not.)
+// Removes fenced code blocks, line by line, following CommonMark: a block opens on
+// a run of three or more backticks or tildes (indented or not, as under a list
+// item) and closes only on a line holding nothing but a run of the same character
+// at least as long. So a four-backtick fence can display a three-backtick example
+// without the inner line closing it. (A single regex over the whole document
+// backtracks super-linearly on an unterminated fence; a line scan does not.)
 export function stripFencedBlocks(markdown) {
   const kept = [];
-  let openMarker = null;
+  let open = null;
   for (const line of markdown.split("\n")) {
-    const marker = /^\s*(```|~~~)/.exec(line)?.[1] ?? null;
-    if (openMarker === null) {
-      if (marker === null) kept.push(line);
-      else openMarker = marker;
-    } else if (marker === openMarker) {
-      openMarker = null;
+    const run = /^\s*(`{3,}|~{3,})/.exec(line)?.[1] ?? null;
+    if (open === null) {
+      if (run === null) kept.push(line);
+      else open = { char: run[0], length: run.length };
+    } else if (run !== null && run[0] === open.char && run.length >= open.length && line.trim() === run) {
+      open = null;
     }
   }
   return kept.join("\n");
