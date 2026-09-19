@@ -97,3 +97,41 @@ export function isReusableOnly(workflowText) {
   return /^\s{2}workflow_call:/m.test(text) &&
     !/^\s{2}(push|pull_request|pull_request_target|schedule|workflow_dispatch|release|workflow_run|branch_protection_rule):/m.test(text);
 }
+
+// Static names a workflow's jobs report as check contexts, as anchored regular
+// expressions. A job reports as its `name:` when it has one, otherwise its key.
+// A name containing `${{ ... }}` (a matrix job, for instance) can only be
+// matched loosely, so its expression becomes a wildcard. A job that calls a
+// reusable workflow reports as "<its name> / <called job>". Line-based, like the
+// other helpers here: it reads the two-space job keys and four-space `name:`.
+export function reportedCheckPatterns(workflowText) {
+  const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const lines = stripYamlComments(workflowText).split("\n");
+  const jobs = [];
+  let inJobs = false;
+  for (const line of lines) {
+    if (/^jobs:\s*$/.test(line)) {
+      inJobs = true;
+    } else if (inJobs && /^\S/.test(line)) {
+      inJobs = false;
+    } else if (inJobs) {
+      const key = /^ {2}([A-Za-z0-9_-]+):\s*$/.exec(line);
+      if (key) jobs.push({ key: key[1], name: null, reusable: false });
+      const current = jobs[jobs.length - 1];
+      const name = /^ {4}name:\s*(.+?)\s*$/.exec(line);
+      if (current && name) current.name = name[1].replace(/^(["'])(.*)\1$/, "$2");
+      if (current && /^ {4}uses:/.test(line)) current.reusable = true;
+    }
+  }
+  return jobs.map(({ key, name, reusable }) => {
+    const display = name ?? key;
+    const source = display.split(/\$\{\{[^}]*\}\}/).map(escape).join(".+");
+    return new RegExp(reusable ? `^${source}( / .+)?$` : `^${source}$`);
+  });
+}
+
+// The required contexts that no job in the given workflow files would report.
+export function unmatchedRequiredContexts(contexts, workflowTexts) {
+  const patterns = workflowTexts.flatMap(reportedCheckPatterns);
+  return contexts.filter((context) => !patterns.some((pattern) => pattern.test(context)));
+}

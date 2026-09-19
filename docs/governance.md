@@ -94,6 +94,19 @@ they appear in the Checks tab), not just "CI". GitHub matches on the exact
 context string, and a renamed job silently stops being enforced if the
 required-checks list isn't updated alongside it.
 
+The opposite mistake is quieter and worse. A job's reported name is its
+`name:` when it has one and its key otherwise, so a job written as
+`secret-scan:` with `name: Secret scan (gitleaks)` reports as
+`Secret scan (gitleaks)`. Requiring the context `secret-scan` then waits for a
+check that never arrives: every pull request stays "blocked" with all checks
+green, and nothing reports an error. Copy each context from the Checks tab of
+a real pull request rather than from the workflow file, and confirm one PR
+can actually merge after changing the list. With an admin token,
+`verify-tier` compares the required contexts against the job names in the
+repository's workflows and warns about any it cannot match. It cannot tell a
+context posted by an external app (SonarCloud, for example) from a mistyped
+one, so read the warning rather than trusting it blindly.
+
 ## delete_branch_on_merge, conversation resolution, commit signing
 
 [tiers.md's Tier 0 checklist](tiers.md#tier-0-every-repository) already

@@ -32,6 +32,10 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   from the CHANGELOG section when a `vX.Y.Z` tag is pushed, and refuses to if `PLAYBOOK_RELEASE`
   or the CHANGELOG heading disagree with the tag. Those Release notes are also what Dependabot
   usually puts in the PR that bumps a caller's pinned SHA. See `docs/ci-cookbook.md` #13.
+- `verify-tier` (with `admin_token`) warns when a required status check matches no workflow job's
+  reported name. Such a check never reports, so every pull request stays blocked with all checks
+  green. `docs/governance.md` now describes this failure, which the earlier text only covered in
+  the other direction (a renamed job).
 - `verify-tier` Tier 2 check for an OpenSSF Scorecard workflow (warning only; private
   repositories can ignore it).
 - Convention: a CHANGELOG entry that adds or tightens a requirement carries an
@@ -83,6 +87,9 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   `dependabot.yml` entry. `verify-tier` warns until the linters exist.
 - **Anyone who copied the section 3 osv-scanner workflow:** pin the two `uses:` lines to a commit
   SHA and move `security-events: write` from the top of the file to those two jobs.
+- **All tiers with branch protection:** confirm each required status check is copied from the
+  Checks tab of a real pull request, not from the workflow file. A job's reported name is its
+  `name:` when set, otherwise its key, and a mismatch blocks every PR silently.
 - **All tiers, repositories calling `verify-tier.yml`:** keep the `github-actions` ecosystem in
   `dependabot.yml`, so a new release arrives as a pull request. Bump the pinned SHA when it does.
 - **Tier 2 and above, public repositories:** add the OpenSSF Scorecard workflow from

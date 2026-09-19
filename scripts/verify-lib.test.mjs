@@ -9,8 +9,10 @@ import {
   isReusableOnly,
   parseVersion,
   readPinnedRelease,
+  reportedCheckPatterns,
   stripFencedBlocks,
   stripYamlComments,
+  unmatchedRequiredContexts,
 } from "./verify-lib.mjs";
 
 const SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1";
@@ -117,4 +119,40 @@ test("stripFencedBlocks drops fenced content, keeps the rest, and tolerates an u
   assert.equal(stripFencedBlocks("a\n~~~\nx\n~~~\nb"), "a\nb");
   assert.equal(stripFencedBlocks("a\n```\nnever closed"), "a");
   assert.equal(stripFencedBlocks("a\n```\nx\n~~~\ny\n```\nb"), "a\nb");
+});
+
+const CI = [
+  "name: CI",
+  "jobs:",
+  "  lint-markdown:",
+  "    runs-on: ubuntu-latest",
+  "  secret-scan:",
+  "    name: Secret scan (gitleaks)",
+  "    runs-on: ubuntu-latest",
+  "  analyze:",
+  "    name: Analyze (${{ matrix.language }})",
+  "  scan-pr:",
+  "    uses: org/repo/.github/workflows/x.yml@0123456789012345678901234567890123456789",
+  "",
+].join("\n");
+
+test("a required context is matched by the job's reported name, not its key", () => {
+  assert.deepEqual(unmatchedRequiredContexts(["secret-scan"], [CI]), ["secret-scan"]);
+  assert.deepEqual(unmatchedRequiredContexts(["Secret scan (gitleaks)"], [CI]), []);
+  assert.deepEqual(unmatchedRequiredContexts(["lint-markdown"], [CI]), []);
+});
+
+test("matrix names and reusable-workflow jobs are matched loosely", () => {
+  assert.deepEqual(unmatchedRequiredContexts(["Analyze (actions)", "Analyze (javascript-typescript)"], [CI]), []);
+  assert.deepEqual(unmatchedRequiredContexts(["scan-pr / osv-scan", "scan-pr"], [CI]), []);
+  assert.deepEqual(unmatchedRequiredContexts(["Analyze"], [CI]), ["Analyze"]);
+});
+
+test("a context posted by an external app is reported as unmatched", () => {
+  assert.deepEqual(unmatchedRequiredContexts(["SonarCloud Code Analysis"], [CI]), ["SonarCloud Code Analysis"]);
+});
+
+test("reportedCheckPatterns ignores everything outside the jobs block", () => {
+  const text = "name: x\non:\n  push:\n    name: not-a-job\njobs:\n  a:\n    runs-on: x\npermissions: {}\n";
+  assert.equal(reportedCheckPatterns(text).length, 1);
 });

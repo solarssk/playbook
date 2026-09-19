@@ -1152,8 +1152,8 @@ workflow, a badge row). It also reports whether a newer playbook release exists 
 call is pinned to (see below). Tier is auto-detected from the calling repo's own `AGENTS.md`.
 
 **What needs `admin_token`, an optional PAT with repository administration access:**
-delete-branch-on-merge, Dependabot security-updates status, and whether branch protection exists
-at all. Skipped and reported as skipped, not silently omitted, if the secret isn't provided. This
+delete-branch-on-merge, Dependabot security-updates status, whether branch protection exists
+at all, and whether every required status check matches the name a workflow job actually reports. Skipped and reported as skipped, not silently omitted, if the secret isn't provided. This
 is the same limitation described in §12: `administration` isn't a scope a workflow's own
 `permissions:` block can grant, so there is no way to read these without a token that already has
 that access.
