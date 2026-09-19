@@ -43,9 +43,27 @@ export function findFloatingActionRefs(workflowText) {
 // example inside a fence, and that example must not be read as the document's
 // own declaration.
 export function detectDeclaredTier(markdown) {
-  const withoutFences = markdown.replace(/^(```|~~~)[^\n]*\n[\s\S]*?^\1[ \t]*$/gm, "");
-  const match = withoutFences.match(/^Tier:\s*(\d)\b/m);
+  const match = stripFencedBlocks(markdown).match(/^Tier:\s*(\d)\b/m);
   return match ? Number(match[1]) : null;
+}
+
+// Removes fenced code blocks, line by line. A block opens on a line starting
+// with ``` or ~~~ and closes on the next line that starts with the same marker.
+// (A single regex over the whole document backtracks super-linearly on an
+// unterminated fence; a line scan does not.)
+export function stripFencedBlocks(markdown) {
+  const kept = [];
+  let openMarker = null;
+  for (const line of markdown.split("\n")) {
+    const marker = /^(```|~~~)/.exec(line)?.[1] ?? null;
+    if (openMarker === null) {
+      if (marker === null) kept.push(line);
+      else openMarker = marker;
+    } else if (marker === openMarker) {
+      openMarker = null;
+    }
+  }
+  return kept.join("\n");
 }
 
 // The `PLAYBOOK_RELEASE: vX.Y.Z` value from verify-tier.yml, or null.

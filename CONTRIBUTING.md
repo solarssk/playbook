@@ -32,12 +32,12 @@ There is nothing to build. To run the same checks CI runs:
 node --test "scripts/**/*.test.mjs"   # unit tests for the verification scripts
 node scripts/release-check.mjs        # workflow pin and CHANGELOG agree
 node scripts/verify-tier.mjs          # this repository against its own standard (set INPUT_TIER=2)
-python scripts/check_doc_snippets.py  # every YAML/JSON snippet in the docs parses
+python scripts/check_doc_snippets.py  # every YAML/JSON snippet in the docs parses (--extract also writes workflow snippets to .snippet-workflows/ for actionlint)
 ```
 
 `actionlint` and `zizmor` lint the workflows; both run offline against a checkout. Install the
 Python dependency from the hash-pinned lockfile:
-`python -m pip install --require-hashes --no-deps -r scripts/requirements.txt`.
+`python -m pip install --require-hashes --only-binary :all: --no-deps -r scripts/requirements.txt`.
 
 ## Making a change
 

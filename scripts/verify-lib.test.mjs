@@ -9,6 +9,7 @@ import {
   isReusableOnly,
   parseVersion,
   readPinnedRelease,
+  stripFencedBlocks,
   stripYamlComments,
 } from "./verify-lib.mjs";
 
@@ -109,4 +110,11 @@ test("isReusableOnly is true only for a workflow_call-only trigger set", () => {
   assert.equal(isReusableOnly("on:\n  push:\n    branches: [main]\n"), false);
   assert.equal(isReusableOnly("on:\n  workflow_call:\n  schedule:\n    - cron: '0 0 * * 0'\n"), false);
   assert.equal(isReusableOnly("on:\n  # workflow_call:\n  push:\n"), false);
+});
+
+test("stripFencedBlocks drops fenced content, keeps the rest, and tolerates an unterminated fence", () => {
+  assert.equal(stripFencedBlocks("a\n```md\nTier: 3\n```\nb"), "a\nb");
+  assert.equal(stripFencedBlocks("a\n~~~\nx\n~~~\nb"), "a\nb");
+  assert.equal(stripFencedBlocks("a\n```\nnever closed"), "a");
+  assert.equal(stripFencedBlocks("a\n```\nx\n~~~\ny\n```\nb"), "a\nb");
 });

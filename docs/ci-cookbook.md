@@ -509,7 +509,7 @@ jobs:
         run: |
           set -euo pipefail
           archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          curl -sSfL -o "$archive" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          curl --proto '=https' --tlsv1.2 -sSfL -o "$archive" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
           echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum --check --strict
           tar -xzf "$archive" gitleaks
           echo "$PWD" >> "$GITHUB_PATH"
@@ -544,6 +544,7 @@ Two details in this recipe are deliberate, and both were wrong in earlier versio
   so a value an outsider can influence (a branch name, a PR title) becomes code. Passed as an
   environment variable, it is only ever data. `zizmor` flags the old form as high severity
   (`template-injection`), and §15 wires it into CI.
+- **The download is HTTPS-only** (`--proto '=https' --tlsv1.2`), so a redirect cannot downgrade it.
 - **The downloaded binary is verified against a checksum before it runs.** An unverified `curl`
   of an executable into a CI job is the kind of unpinned dependency OpenSSF Scorecard's
   Pinned-Dependencies check reports. Take the hash from the release's own checksums file.
@@ -1304,7 +1305,7 @@ jobs:
         run: |
           set -euo pipefail
           archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          curl -sSfL -o "$archive" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          curl --proto '=https' --tlsv1.2 -sSfL -o "$archive" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
           echo "${ACTIONLINT_SHA256}  ${archive}" | sha256sum --check --strict
           tar -xzf "$archive" actionlint
           echo "$PWD" >> "$GITHUB_PATH"
@@ -1328,7 +1329,7 @@ Notes:
 - **Run it locally first.** `zizmor .` and `actionlint` both run offline against a checkout. Add
   `GH_TOKEN=$(gh auth token)` to `zizmor` for its online audits.
 - **The docs' own snippets are workflows too.** This repository extracts every complete workflow
-  quoted in its Markdown and runs `actionlint` on it (`scripts/check_doc_snippets.py`), because a
+  quoted in its Markdown and runs `actionlint` on it (`scripts/check_doc_snippets.py --extract`), because a
   snippet that does not parse gets pasted into real repositories anyway.
 - **A finding is a fix, not a suppression.** If a `zizmor: ignore` comment is genuinely needed,
   put the reason in the same comment.

@@ -34,7 +34,8 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install hash-pinned dependencies
-        run: python -m pip install --require-hashes --no-deps -r scripts/requirements.txt
+        run: |
+          python -m pip install --require-hashes --only-binary :all: --no-deps -r scripts/requirements.txt
       - name: Every YAML file parses
         run: python scripts/validate_yaml.py
       - name: Every YAML and JSON snippet in the Markdown parses
@@ -69,14 +70,13 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install hash-pinned dependencies
-        run: python -m pip install --require-hashes --no-deps -r scripts/requirements.txt
+        run: |
+          python -m pip install --require-hashes --only-binary :all: --no-deps -r scripts/requirements.txt
 
       # Complete workflows quoted in the docs are copied into real CI files, so
       # they get the same expression and shell checks as this repository's own.
       - name: Extract workflow snippets from the docs
-        env:
-          SNIPPET_DIR: ${{ runner.temp }}/snippets
-        run: python scripts/check_doc_snippets.py "$SNIPPET_DIR"
+        run: python scripts/check_doc_snippets.py --extract
 
       - name: Install actionlint (checksum-verified)
         env:
@@ -85,15 +85,13 @@ jobs:
         run: |
           set -euo pipefail
           archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          curl -sSfL -o "$archive" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          curl --proto '=https' --tlsv1.2 -sSfL -o "$archive" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
           echo "${ACTIONLINT_SHA256}  ${archive}" | sha256sum --check --strict
           tar -xzf "$archive" actionlint
           echo "$PWD" >> "$GITHUB_PATH"
 
       - name: actionlint
-        env:
-          SNIPPET_DIR: ${{ runner.temp }}/snippets
-        run: actionlint .github/workflows/*.yml "$SNIPPET_DIR"/*.yml
+        run: actionlint .github/workflows/*.yml .snippet-workflows/*.yml
 
       - uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482  # v0.6.4
         with:
@@ -149,7 +147,7 @@ jobs:
         run: |
           set -euo pipefail
           archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          curl -sSfL -o "$archive" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          curl --proto '=https' --tlsv1.2 -sSfL -o "$archive" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
           echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum --check --strict
           tar -xzf "$archive" gitleaks
           echo "$PWD" >> "$GITHUB_PATH"
