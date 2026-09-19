@@ -59,8 +59,10 @@ permissions:
   contents: read
 
 env:
-  # Bump this alongside every tag (see the comment above). It's the ref this
-  # job checks itself out at, independent of whatever ref the caller used.
+  # Bump this alongside every tag (see the comment above), together with the
+  # literal `ref:` of the playbook checkout below. Both name the release this job
+  # checks itself out at, independent of whatever ref the caller used;
+  # scripts/release-check.mjs fails if they differ.
   PLAYBOOK_RELEASE: v0.1.1
 
 jobs:
@@ -76,7 +78,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: solarssk/playbook
-          ref: ${{ env.PLAYBOOK_RELEASE }}
+          ref: v0.1.1 # a literal, not ${{ env.PLAYBOOK_RELEASE }}; release-check keeps the two equal
           path: .playbook-tools
           persist-credentials: false
           sparse-checkout: |

@@ -14,19 +14,23 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 
-import { extractChangelogSection, parseVersion, readPinnedRelease } from "./verify-lib.mjs";
+import { extractChangelogSection, parseVersion, readPinnedRelease, readPlaybookCheckoutRef } from "./verify-lib.mjs";
 
 function fail(message) {
   console.error(`release-check: ${message}`);
   process.exit(1);
 }
 
-const pinned = readPinnedRelease(readFileSync(".github/workflows/verify-tier.yml", "utf8"));
+const workflow = readFileSync(".github/workflows/verify-tier.yml", "utf8");
+const pinned = readPinnedRelease(workflow);
 const pinnedParts = parseVersion(pinned);
 if (!pinnedParts) {
   fail("PLAYBOOK_RELEASE in .github/workflows/verify-tier.yml is missing or not a vX.Y.Z tag.");
 }
 const pinnedTag = `v${pinnedParts.join(".")}`;
+if (readPlaybookCheckoutRef(workflow) !== pinnedTag) {
+  fail("The playbook checkout's ref in .github/workflows/verify-tier.yml differs from PLAYBOOK_RELEASE. Set both to the release.");
+}
 
 const tagInput = process.env.RELEASE_TAG;
 if (tagInput !== undefined && tagInput !== "") {

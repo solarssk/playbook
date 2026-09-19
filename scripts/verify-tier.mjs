@@ -13,7 +13,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { detectDeclaredTier as tierFromMarkdown, findFloatingActionRefs, isNewer, isReusableOnly, parseVersion, unmatchedRequiredContexts } from "./verify-lib.mjs";
+import { detectDeclaredTier as tierFromMarkdown, escapeTableCell, findFloatingActionRefs, isNewer, isReusableOnly, parseVersion, unmatchedRequiredContexts, untrustedText } from "./verify-lib.mjs";
 
 const repoRoot = process.cwd();
 const results = []; // { tier, id, label, status: "pass"|"fail"|"warn"|"skip", detail }
@@ -152,7 +152,7 @@ async function checkPlaybookVersion() {
       record(0, "playbook-version", label, "pass");
     }
   } catch (error) {
-    record(0, "playbook-version", label, "skip", `Could not check for a newer release: ${error.message}`);
+    record(0, "playbook-version", label, "skip", `Could not check for a newer release: ${untrustedText(error.message)}`);
   }
 }
 
@@ -241,7 +241,7 @@ async function checkSettings(token) {
     const dependabotStatus = repo.security_and_analysis?.dependabot_security_updates?.status;
     record(0, "dependabot-security-updates", "Dependabot security updates enabled",
       dependabotStatus === "enabled" ? "pass" : "warn",
-      dependabotStatus ? `Status: ${dependabotStatus}.` : "security_and_analysis not present in the response (needs org owner/security-manager access, not just repo admin, in some org configurations).");
+      dependabotStatus ? `Status: ${untrustedText(dependabotStatus)}.` : "security_and_analysis not present in the response (needs org owner/security-manager access, not just repo admin, in some org configurations).");
 
     const protectionResponse = await fetch(
       `https://api.github.com/repos/${repoSlug}/branches/${repo.default_branch}/protection`,
@@ -254,18 +254,18 @@ async function checkSettings(token) {
       const protection = await protectionResponse.json();
       const contexts = protection.required_status_checks?.contexts ?? [];
       record(0, "branch-protection", "Branch protection enabled on the default branch", "pass",
-        `Required status checks: ${contexts.length ? contexts.join(", ") : "(none declared)"}.`);
+        `Required status checks: ${contexts.length ? contexts.map((context) => untrustedText(context)).join(", ") : "(none declared)"}.`);
 
       const unmatched = unmatchedRequiredContexts(contexts, listWorkflowFiles().map((file) => readFileSync(file, "utf8")));
       record(0, "required-check-names", "Every required status check matches a workflow job's reported name",
         unmatched.length === 0 ? "pass" : "warn",
-        `No workflow job reports as: ${unmatched.join(", ")}. A required check that never reports blocks every pull request with no error. ` +
+        `No workflow job reports as: ${unmatched.map((context) => untrustedText(context)).join(", ")}. A required check that never reports blocks every pull request with no error. ` +
           "A context posted by an external app (SonarCloud, for example) is expected here; a mistyped job name is not. See docs/governance.md, branch protection.");
     } else {
       throw new Error(`GET branch protection: ${protectionResponse.status}`);
     }
   } catch (error) {
-    record(0, "settings", "Repo-settings checks", "warn", `Could not complete: ${error.message}`);
+    record(0, "settings", "Repo-settings checks", "warn", `Could not complete: ${untrustedText(error.message)}`);
   }
 }
 
@@ -296,7 +296,7 @@ const icon = { pass: "✅", fail: "❌", warn: "⚠️", skip: "➖" };
 const lines = [`# Playbook tier verification (declared: Tier ${declaredTier})`, ""];
 lines.push("| Status | Check | Detail |", "|---|---|---|");
 for (const r of relevant) {
-  lines.push(`| ${icon[r.status]} ${r.status} | ${r.label} | ${r.detail.replace(/\|/g, "\\|")} |`);
+  lines.push(`| ${icon[r.status]} ${r.status} | ${escapeTableCell(r.label)} | ${escapeTableCell(r.detail)} |`);
 }
 const summary = lines.join("\n");
 console.log(summary);
