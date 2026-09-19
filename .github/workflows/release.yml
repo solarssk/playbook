@@ -17,7 +17,7 @@ name: Release
 # provenance attestation for the archive. Adopters pin a commit SHA, not this
 # archive, but the attestation lets anyone verify that an archive came from
 # this repository's own workflow:
-#   gh attestation verify playbook-<tag>.tar.gz --repo <owner>/playbook
+#   gh attestation verify "playbook-${TAG}.tar.gz" --repo "${OWNER}/playbook"   (set TAG and OWNER first)
 #
 # To release: update CHANGELOG.md and PLAYBOOK_RELEASE in one commit, merge it,
 # then tag that commit `vX.Y.Z` and push the tag.

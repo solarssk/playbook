@@ -84,6 +84,14 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 - The issue templates applied a `triage` label that the standard's taxonomy does not define and that
   did not exist in the repository, so GitHub dropped it silently. Removed from
   `templates/ISSUE_TEMPLATE/bug.yml`.
+- **`docs/ci-cookbook.md` section 12b (documentation-impact check) had two gaps.** It exempted a PR
+  whose head branch was named `dependabot/...`, which anyone can create, so it now matches the
+  author only. And "No doc update needed: <state the reason>" passed with the template's own
+  placeholder as the reason; a real reason is now required.
+- `verify-tier` now treats a workflow as reusable-only only when `workflow_call` is its sole
+  trigger, instead of checking for a fixed list of other events, and requires a reusable-workflow
+  job's required check to carry its `<caller> / <called job>` suffix. It also reads a quoted
+  `PLAYBOOK_RELEASE` value.
 - `templates/pull_request_template.md` offered "No doc update needed (explain why)", which the
   documentation-impact check in section 12 does not accept. It now reads
   "No doc update needed: <state the reason>".
@@ -99,6 +107,9 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   release. Neither is checked automatically.
 - **All tiers:** untrusted context values reach the shell through `env:`, and downloaded binaries
   are checksum-verified (`docs/tiers.md`, Tier 1). `zizmor` at Tier 2 catches the first.
+- **Anyone who copied the section 12b documentation-impact script:** match the PR author
+  (`dependabot[bot]`) instead of the branch name, and reject the untouched
+  `<state the reason>` placeholder, as the recipe now does.
 - **Anyone who copied the issue template:** remove `labels: ["triage"]` unless you created that
   label.
 - **Anyone who copied the section 3 osv-scanner workflow:** pin the two `uses:` lines to a commit

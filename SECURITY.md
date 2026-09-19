@@ -23,10 +23,12 @@ serious kind of report this repository can receive.
 
 Each GitHub Release carries a source archive, a `SHA256SUMS` file, and a signed build provenance
 attestation for the archive. To check that an archive was built by this repository's own release
-workflow:
+workflow. Set `TAG` to the release and `OWNER` to the account that owns the repository:
 
 ```bash
-gh attestation verify playbook-<tag>.tar.gz --repo <owner>/playbook
+TAG=v0.2.0
+OWNER=example-owner
+gh attestation verify "playbook-${TAG}.tar.gz" --repo "${OWNER}/playbook"
 ```
 
 Repositories that call `verify-tier.yml` should pin it to a commit SHA rather than a tag or

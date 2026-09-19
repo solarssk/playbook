@@ -72,7 +72,7 @@ export function readPinnedRelease(workflowText) {
   for (const line of stripYamlComments(workflowText).split("\n")) {
     const trimmed = line.trim();
     if (!trimmed.startsWith(key)) continue;
-    const value = trimmed.slice(key.length).trim();
+    const value = unquote(trimmed.slice(key.length).trim());
     return value === "" || /\s/.test(value) ? null : value;
   }
   return null;
@@ -95,13 +95,33 @@ export function extractChangelogSection(changelog, version) {
   return lines.slice(start + 1, end).join("\n").trim();
 }
 
+// The trigger names a workflow declares under its top-level `on:` key: a block
+// (`on:` then two-space keys), an inline list (`on: [push, pull_request]`), or a
+// single name (`on: push`). Line-based, like the other helpers here.
+export function workflowTriggers(workflowText) {
+  const lines = stripYamlComments(workflowText).split("\n");
+  const start = lines.findIndex((line) => /^["']?on["']?:/.test(line));
+  if (start === -1) return [];
+  const inline = lines[start].slice(lines[start].indexOf(":") + 1).trim();
+  if (inline !== "") {
+    return inline.replaceAll(/[[\]{}]/g, " ").split(",").map((part) => part.split(":")[0].trim()).filter(Boolean);
+  }
+  const triggers = [];
+  for (const line of lines.slice(start + 1)) {
+    if (/^\S/.test(line)) break;
+    const key = /^ {2}([A-Za-z_]+):/.exec(line);
+    if (key) triggers.push(key[1]);
+  }
+  return triggers;
+}
+
 // True for a workflow that can only be started by another workflow
-// (`on: workflow_call` with no other trigger). `concurrency:` belongs to the
-// calling workflow in that case, so a checker should not expect one here.
+// (`workflow_call` is its sole trigger). `concurrency:` belongs to the calling
+// workflow in that case, so a checker should not expect one here. Any other
+// trigger, listed or not, makes the workflow triggerable on its own.
 export function isReusableOnly(workflowText) {
-  const text = stripYamlComments(workflowText);
-  return /^\s{2}workflow_call:/m.test(text) &&
-    !/^\s{2}(push|pull_request|pull_request_target|schedule|workflow_dispatch|release|workflow_run|branch_protection_rule):/m.test(text);
+  const triggers = workflowTriggers(workflowText);
+  return triggers.length === 1 && triggers[0] === "workflow_call";
 }
 
 // Strips one pair of matching quotes from a YAML scalar.
@@ -143,11 +163,13 @@ function parseJobs(workflowText) {
 // An anchored pattern for the check name a job reports. A name containing
 // `${{ ... }}` (a matrix job, for instance) can only be matched loosely, so its
 // expression becomes a wildcard. A job that calls a reusable workflow reports as
-// "<its name> / <called job>".
+// "<its name> / <called job>", and the suffix is required: the bare caller name
+// is never the name of a check that runs (a skipped job is the one exception,
+// and requiring a skipped check is not something to encourage).
 function patternFor({ key, name, reusable }) {
   const escape = (text) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
   const source = (name ?? key).split(/\$\{\{[^}]*\}\}/).map(escape).join(".+");
-  return new RegExp(reusable ? `^${source}( / .+)?$` : `^${source}$`);
+  return new RegExp(reusable ? `^${source} / .+$` : `^${source}$`);
 }
 
 // Static names a workflow's jobs report as check contexts, as anchored regular
@@ -160,4 +182,14 @@ export function reportedCheckPatterns(workflowText) {
 export function unmatchedRequiredContexts(contexts, workflowTexts) {
   const patterns = workflowTexts.flatMap(reportedCheckPatterns);
   return contexts.filter((context) => !patterns.some((pattern) => pattern.test(context)));
+}
+
+// Reads the "Documentation impact" checkboxes from a pull request body.
+// "No doc update needed" only counts with a real reason: the template's own
+// placeholder text does not.
+export function readDocsImpactDeclaration(body) {
+  return {
+    docsUpdated: /^- \[[xX]\] Docs updated\s*$/m.test(body),
+    noDocsUpdate: /^- \[[xX]\] No doc update needed: (?!<state the reason>\s*$)\S.+$/m.test(body),
+  };
 }

@@ -81,10 +81,11 @@ Use the repository's [PR template](.github/pull_request_template.md) and keep th
 headings as they are. Select exactly one **Documentation impact** option; CI checks it against
 the diff.
 
-This is currently a single-maintainer project: [@solarssk](https://github.com/solarssk) reviews
-and merges every PR, including their own, once CI is green. Required review count stays at 0
-until a second maintainer has write access; see [docs/governance.md](docs/governance.md).
+This is currently a single-maintainer project: the maintainer named in
+[CODEOWNERS](.github/CODEOWNERS) reviews and merges each PR once CI is green. The required review
+count stays at 0 until a second maintainer has write access; see
+[docs/governance.md](docs/governance.md).
 
 ## Questions
 
-Open an issue, or reach [@solarssk](https://github.com/solarssk).
+Open an issue.

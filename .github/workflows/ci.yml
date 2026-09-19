@@ -91,7 +91,9 @@ jobs:
           echo "$PWD" >> "$GITHUB_PATH"
 
       - name: actionlint
-        run: actionlint .github/workflows/*.yml .snippet-workflows/*.yml
+        run: |
+          set -euo pipefail
+          find .github/workflows .snippet-workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) -print0 | xargs -0 actionlint
 
       - uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482  # v0.6.4
         with:

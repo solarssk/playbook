@@ -87,7 +87,9 @@ at flagship scale, not picked.
   cut the sentence.
 - **No real infrastructure details, ever.** No real IPs, hostnames, device models, or usernames,
   including in examples. Use clearly fictional placeholders (`<owner>/<repo>`, `192.0.2.0/24`,
-  `@<maintainer-handle>`).
+  `@<maintainer-handle>`). This repository's own owner and name in badge URLs, links, and the
+  pointer block are its identity, not infrastructure, and stay real: a badge with a placeholder
+  does not render. Contributor-facing prose still names no individual account.
 - **Keep it tiered, resist "just copy the best example."** When updating a doc or template based
   on something observed in a real repository, ask which tier it actually belongs at before
   adding it. The fastest way for this repo to become useless is for every addition to assume

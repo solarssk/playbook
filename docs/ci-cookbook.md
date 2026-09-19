@@ -1036,14 +1036,14 @@ const event = JSON.parse(readFileSync(eventPath, "utf8"));
 const pullRequest = event.pull_request;
 if (!pullRequest) process.exit(0);
 
-// Automated dependency PRs can't fill in a hand-written template body.
-const authorLogin = pullRequest.user?.login ?? "";
-const headRef = pullRequest.head?.ref ?? "";
-if (authorLogin === "dependabot[bot]" || headRef.startsWith("dependabot/")) process.exit(0);
+// Automated dependency PRs can't fill in a hand-written template body. Match the author, never
+// the branch name: anyone can open a PR from a branch called dependabot/....
+if ((pullRequest.user?.login ?? "") === "dependabot[bot]") process.exit(0);
 
 const body = pullRequest.body ?? "";
 const docsUpdated = /^- \[[xX]\] Docs updated\s*$/m.test(body);
-const noDocsUpdate = /^- \[[xX]\] No doc update needed: \S.+$/m.test(body);
+// A real reason is required: the template's own placeholder text does not count.
+const noDocsUpdate = /^- \[[xX]\] No doc update needed: (?!<state the reason>\s*$)\S.+$/m.test(body);
 
 if (docsUpdated === noDocsUpdate) {
   console.error(
@@ -1283,9 +1283,9 @@ reads them the way a reviewer reads application code. Two linters cover differen
   permissions, cache poisoning in release jobs, credential persistence, and Dependabot config
   without a cooldown.
 
-Neither replaces the other. Both are fast, free, and run without secrets. The lesson that put this
-recipe in the standard: this repository's own CI, copied from an earlier version of §7, carried a
-high-severity template injection that no reviewer had flagged and `zizmor` found in seconds.
+Neither replaces the other. Both are fast, free, and run without secrets. A template injection is
+easy to write and hard to see in review, because the expression looks like ordinary templating,
+while `zizmor` finds it mechanically in seconds.
 
 **When to use it:** Tier 2 and above, and worth it earlier on any repo whose workflows have grown
 past a single lint job. Start report-only if the first run finds a backlog, then make it blocking.

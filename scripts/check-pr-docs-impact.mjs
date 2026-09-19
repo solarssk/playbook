@@ -5,20 +5,20 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
+import { readDocsImpactDeclaration } from "./verify-lib.mjs";
+
 const eventPath = process.env.GITHUB_EVENT_PATH;
 if (!eventPath) process.exit(0);
 const event = JSON.parse(readFileSync(eventPath, "utf8"));
 const pullRequest = event.pull_request;
 if (!pullRequest) process.exit(0);
 
-// Automated dependency PRs can't fill in a hand-written template body.
-const authorLogin = pullRequest.user?.login ?? "";
-const headRef = pullRequest.head?.ref ?? "";
-if (authorLogin === "dependabot[bot]" || headRef.startsWith("dependabot/")) process.exit(0);
+// Automated dependency PRs can't fill in a hand-written template body. Match
+// the author, never the branch name: anyone can open a PR from a branch called
+// dependabot/....
+if ((pullRequest.user?.login ?? "") === "dependabot[bot]") process.exit(0);
 
-const body = pullRequest.body ?? "";
-const docsUpdated = /^- \[[xX]\] Docs updated\s*$/m.test(body);
-const noDocsUpdate = /^- \[[xX]\] No doc update needed: \S.+$/m.test(body);
+const { docsUpdated, noDocsUpdate } = readDocsImpactDeclaration(pullRequest.body ?? "");
 
 if (docsUpdated === noDocsUpdate) {
   console.error(
@@ -31,6 +31,8 @@ if (docsUpdated === noDocsUpdate) {
 // standard itself. A change to CI, scripts, or workflow files alone is the case
 // where "No doc update needed" is the honest answer.
 const DOCS_PATHS = ["docs/", "templates/", "README.md", "AGENTS.md", "CLAUDE.md", "SECURITY.md", "CONTRIBUTING.md"];
+// The absolute path is deliberate: resolving an executable through PATH is what
+// static analysis flags, and the hosted runner image installs git here.
 const changedFiles = execFileSync(
   "/usr/bin/git",
   ["diff", "--name-only", `${pullRequest.base.sha}...${pullRequest.head.sha}`],

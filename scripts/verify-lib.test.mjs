@@ -8,11 +8,13 @@ import {
   isNewer,
   isReusableOnly,
   parseVersion,
+  readDocsImpactDeclaration,
   readPinnedRelease,
   reportedCheckPatterns,
   stripFencedBlocks,
   stripYamlComments,
   unmatchedRequiredContexts,
+  workflowTriggers,
 } from "./verify-lib.mjs";
 
 const SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1";
@@ -144,7 +146,7 @@ test("a required context is matched by the job's reported name, not its key", ()
 
 test("matrix names and reusable-workflow jobs are matched loosely", () => {
   assert.deepEqual(unmatchedRequiredContexts(["Analyze (actions)", "Analyze (javascript-typescript)"], [CI]), []);
-  assert.deepEqual(unmatchedRequiredContexts(["scan-pr / osv-scan", "scan-pr"], [CI]), []);
+  assert.deepEqual(unmatchedRequiredContexts(["scan-pr / osv-scan", "scan-pr / any-job"], [CI]), []);
   assert.deepEqual(unmatchedRequiredContexts(["Analyze"], [CI]), ["Analyze"]);
 });
 
@@ -155,4 +157,39 @@ test("a context posted by an external app is reported as unmatched", () => {
 test("reportedCheckPatterns ignores everything outside the jobs block", () => {
   const text = "name: x\non:\n  push:\n    name: not-a-job\njobs:\n  a:\n    runs-on: x\npermissions: {}\n";
   assert.equal(reportedCheckPatterns(text).length, 1);
+});
+
+test("a reusable-workflow job must be required with its called-job suffix", () => {
+  assert.deepEqual(unmatchedRequiredContexts(["scan-pr"], [CI]), ["scan-pr"]);
+});
+
+test("workflowTriggers reads block, inline-list, and single-name forms", () => {
+  assert.deepEqual(workflowTriggers("on:\n  push:\n    branches: [main]\n  pull_request: {}\njobs: {}\n"), ["push", "pull_request"]);
+  assert.deepEqual(workflowTriggers("on: [push, pull_request]\njobs: {}\n"), ["push", "pull_request"]);
+  assert.deepEqual(workflowTriggers("on: push\n"), ["push"]);
+  assert.deepEqual(workflowTriggers('"on":\n  workflow_call:\n'), ["workflow_call"]);
+  assert.deepEqual(workflowTriggers("name: x\n"), []);
+});
+
+test("isReusableOnly is false whenever any other trigger is present, listed or not", () => {
+  assert.equal(isReusableOnly("on:\n  workflow_call:\n"), true);
+  assert.equal(isReusableOnly("on: workflow_call\n"), true);
+  for (const other of ["issues", "repository_dispatch", "merge_group", "discussion", "some_future_event"]) {
+    assert.equal(isReusableOnly(`on:\n  workflow_call:\n  ${other}:\n`), false, other);
+  }
+  assert.equal(isReusableOnly("on: [workflow_call, push]\n"), false);
+  assert.equal(isReusableOnly("name: no triggers\n"), false);
+});
+
+test("readPinnedRelease accepts a quoted YAML scalar", () => {
+  assert.equal(readPinnedRelease('env:\n  PLAYBOOK_RELEASE: "v0.2.0"\n'), "v0.2.0");
+  assert.equal(readPinnedRelease("env:\n  PLAYBOOK_RELEASE: 'v0.2.0'  # note\n"), "v0.2.0");
+});
+
+test("readDocsImpactDeclaration requires a real reason and rejects the template placeholder", () => {
+  const pick = (docs, none) => `- [${docs}] Docs updated\n- [${none}] No doc update needed: ${"REASON"}\n`;
+  assert.deepEqual(readDocsImpactDeclaration(pick("x", " ").replace("REASON", "ci only")), { docsUpdated: true, noDocsUpdate: false });
+  assert.deepEqual(readDocsImpactDeclaration(pick(" ", "x").replace("REASON", "ci only")), { docsUpdated: false, noDocsUpdate: true });
+  assert.deepEqual(readDocsImpactDeclaration(pick(" ", "x").replace("REASON", "<state the reason>")), { docsUpdated: false, noDocsUpdate: false });
+  assert.deepEqual(readDocsImpactDeclaration("nothing selected"), { docsUpdated: false, noDocsUpdate: false });
 });
