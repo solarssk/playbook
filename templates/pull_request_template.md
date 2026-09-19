@@ -45,7 +45,7 @@ Choose exactly one option.
 -->
 
 - [ ] Docs updated
-- [ ] No doc update needed (explain why)
+- [ ] No doc update needed: <state the reason>
 
 ---
 

@@ -13,6 +13,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { detectDeclaredTier as tierFromMarkdown, findFloatingActionRefs, isNewer, isReusableOnly, parseVersion } from "./verify-lib.mjs";
+
 const repoRoot = process.cwd();
 const results = []; // { tier, id, label, status: "pass"|"fail"|"warn"|"skip", detail }
 
@@ -47,9 +49,7 @@ function workflowText() {
 // ---------- tier detection ----------
 
 function detectDeclaredTier() {
-  const agents = readIfExists("AGENTS.md") ?? readIfExists("CLAUDE.md") ?? "";
-  const match = agents.match(/^Tier:\s*(\d)\b/m);
-  return match ? Number(match[1]) : null;
+  return tierFromMarkdown(readIfExists("AGENTS.md") ?? readIfExists("CLAUDE.md") ?? "");
 }
 
 // ---------- Tier 0 ----------
@@ -67,20 +67,13 @@ function checkTier0() {
 
 // ---------- Tier 1 ----------
 
-const SHA_PIN_PATTERN = /uses:\s*[^\s@]+@([0-9a-f]{40}|[0-9a-f]{7,39}\s*#)/;
-const FLOATING_USES_PATTERN = /uses:\s*([^\s@]+)@([^\s#]+)/g;
-
 function checkShaPinning() {
   const files = listWorkflowFiles();
   if (files.length === 0) return { status: "skip", detail: "No workflow files to check." };
   const floating = [];
   for (const file of files) {
-    const text = readFileSync(file, "utf8");
-    let match;
-    FLOATING_USES_PATTERN.lastIndex = 0;
-    while ((match = FLOATING_USES_PATTERN.exec(text))) {
-      const [, action, ref] = match;
-      if (!/^[0-9a-f]{40}$/.test(ref)) floating.push(`${action}@${ref} (${file.split("/").pop()})`);
+    for (const ref of findFloatingActionRefs(readFileSync(file, "utf8"))) {
+      floating.push(`${ref} (${file.split("/").pop()})`);
     }
   }
   if (floating.length === 0) return { status: "pass", detail: "" };
@@ -118,18 +111,6 @@ function checkTier1() {
 }
 
 // ---------- playbook version drift ----------
-
-function parseVersion(tag) {
-  const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(tag ?? "");
-  return match ? match.slice(1).map(Number) : null;
-}
-
-function isNewer(candidate, current) {
-  for (let i = 0; i < 3; i += 1) {
-    if (candidate[i] !== current[i]) return candidate[i] > current[i];
-  }
-  return false;
-}
 
 // Tells an adopting repo when the playbook has published a newer release than
 // the one it is pinned to. The version this script runs at IS the version the
@@ -189,13 +170,18 @@ function checkTier2() {
     "No 'Documentation impact' section found in the PR template. See docs/ci-cookbook.md #12.");
 
   const wf = workflowText();
-  const concurrencyBlocks = (wf.match(/^concurrency:/gm) ?? []).length;
-  const workflowCount = listWorkflowFiles().length;
+  // A reusable-only workflow takes its concurrency from the calling workflow.
+  const triggerable = listWorkflowFiles().filter((file) => !isReusableOnly(readFileSync(file, "utf8")));
+  const concurrencyBlocks = triggerable.filter((file) => /^concurrency:/m.test(readFileSync(file, "utf8"))).length;
+  const workflowCount = triggerable.length;
   record(2, "concurrency", "`concurrency:` groups present on workflows", workflowCount === 0 ? "skip" : concurrencyBlocks >= workflowCount ? "pass" : "warn",
     `${concurrencyBlocks}/${workflowCount} workflow files declare a top-level concurrency: block. See docs/ci-cookbook.md #2.`);
 
   record(2, "sast", "CodeQL or Semgrep configured", /codeql-action|semgrep/i.test(wf) ? "pass" : "warn",
     "No CodeQL or Semgrep reference found in any workflow.");
+
+  record(2, "workflow-lint", "A workflow linter (zizmor or actionlint) configured", /zizmor|actionlint/i.test(wf) ? "pass" : "warn",
+    "No zizmor or actionlint reference found in any workflow. They catch template injection, excessive permissions, and unpinned actions that a keyword check cannot. See docs/ci-cookbook.md #15.");
 
   record(2, "scorecard", "OpenSSF Scorecard workflow configured", /ossf\/scorecard-action/.test(wf) ? "pass" : "warn",
     "No ossf/scorecard-action reference found. Expected on public repositories only; a private repository can ignore this. See docs/openssf.md.");

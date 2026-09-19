@@ -59,11 +59,24 @@ Tier: 2 (see playbook/docs/tiers.md)
 Add that block the first time you bring a repository up to standard, so the next agent doesn't
 have to re-derive the tier from scratch.
 
+## Repository standard
+
+This repository is held to the standard it publishes, and CI enforces it: the `self-verify` job
+runs `scripts/verify-tier.mjs` against this repository.
+
+Tier: 2 (see [docs/tiers.md](docs/tiers.md))
+
+It is Tier 2, not Tier 1, even though it is small: other repositories execute its reusable
+workflow and script in their own CI, with their own tokens, so a mistake here has a blast radius
+beyond this repository ([docs/tiers.md, "How to pick a tier"](docs/tiers.md#how-to-pick-a-tier),
+question 2). Small size does not lower the tier. Tier 3 is not claimed: it is earned by operating
+at flagship scale, not picked.
+
 ## If you're working on this repository itself
 
-- **This repo is small on purpose.** It's documentation and templates, not a running service.
-  Tier 0/1 hygiene applies to it (LICENSE, CODEOWNERS, a minimal CI that lints Markdown/YAML). It
-  does not need Tier 2+ machinery, because it doesn't ship a service or a container.
+- **This repo holds itself to the standard it publishes.** See "Repository standard" above, and
+  treat a failing `self-verify` CI job as a real finding, not noise. Never add a recommendation
+  here that this repository does not itself follow, or that its own CI would reject.
 - **No personal narrative, anywhere in this repo.** Every rule here is stated as a generic
   engineering principle on its own merits. "A reporter needs a private channel to disclose a
   vulnerability before it's public" is fine reasoning; "because the maintainer doesn't use a work
@@ -134,6 +147,8 @@ any one of them is updated.
 | [docs/security-docs.md](docs/security-docs.md) | How to write SECURITY.md and handle vulnerability disclosure |
 | [templates/](templates/) | Ready-to-copy starter files |
 | [.github/workflows/verify-tier.yml](.github/workflows/verify-tier.yml) | A reusable workflow another repo calls to check itself against this standard automatically. See docs/ci-cookbook.md #13 |
+| [scripts/](scripts/) | `verify-tier.mjs` (the checks), `verify-lib.mjs` (its tested helpers), `release-check.mjs` (release bookkeeping), `check-pr-docs-impact.mjs`, and the Python validators CI runs. Unit tests sit beside them as `*.test.mjs` |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to propose a change to the standard, and how to run CI's checks locally |
 | [.github/workflows/release.yml](.github/workflows/release.yml) | Publishes a GitHub Release from the CHANGELOG when a `vX.Y.Z` tag is pushed; this is how adopters learn a new version exists |
 
 ## Conventions for this repo's own commits and PRs

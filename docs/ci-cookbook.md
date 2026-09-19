@@ -39,6 +39,7 @@ Tier 3 recipe; a Tier 1 repo that suddenly gets real users should move up.
 12. [Docs as source of truth, and catching stale docs at PR time](#12-docs-as-source-of-truth-and-catching-stale-docs-at-pr-time)
 13. [Verifying a repo against this standard automatically](#13-verifying-a-repo-against-this-standard-automatically)
 14. [Hash-pinned dependency lockfile (Python: pip-compile)](#14-hash-pinned-dependency-lockfile-python-pip-compile)
+15. [Linting workflows (actionlint and zizmor)](#15-linting-workflows-actionlint-and-zizmor)
 
 ---
 
@@ -87,13 +88,15 @@ accurate.
       directory: "/"
       schedule:
         interval: "weekly"
+      cooldown:
+        default-days: 7
       groups:
         codeql-action:
           patterns:
             - "github/codeql-action/*"
   ```
 
-  The `groups:` block is optional. It's worth adding for any action family whose sub-actions are
+  The `cooldown:` block waits a week before proposing a freshly published version (see §4). The `groups:` block is optional. It's worth adding for any action family whose sub-actions are
   always bumped together (`github/codeql-action/init`, `/autobuild`, `/analyze`,
   `/upload-sarif`), so a version bump lands as one PR instead of four.
 
@@ -220,21 +223,28 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   scan-pr:
     if: github.event_name == 'pull_request'
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.5.1
+    permissions:
+      contents: read
+      security-events: write # upload SARIF; granted to this job only
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67  # v2.5.1
 
   scan-scheduled:
     if: github.event_name == 'schedule'
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.5.1
+    permissions:
+      contents: read
+      security-events: write # upload SARIF; granted to this job only
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67  # v2.5.1
 ```
 
-Pin `@v2.5.1` to whatever the project's current release actually is when you adopt this (check
-its own releases page), and keep it fresh the same way as any other Action, via Dependabot's
-`github-actions` ecosystem (§4).
+Pinned to a commit SHA like every other `uses:` (§1), including a reusable workflow: a tag can be
+moved, a SHA cannot. Use the SHA of whatever the project's current release is when you adopt this
+(check its own releases page), and keep it fresh via Dependabot's `github-actions` ecosystem
+(§4). `security-events: write` sits on the two jobs that upload SARIF, not at the top of the file,
+so nothing else in the workflow inherits it.
 
 **Avoiding the "permanently red" failure mode:** a real known-unfixable transitive CVE (no patched
 version published yet) will otherwise block every unrelated PR indefinitely, which is exactly how
@@ -266,6 +276,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     groups:
       minor-and-patch:
@@ -277,6 +289,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       python-dependencies:
         patterns:
@@ -286,6 +300,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       codeql-action:
         patterns:
@@ -295,6 +311,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
 
   # Easy to miss, and the single most common gap a compose-stack audit
   # finds: a SECOND docker entry for anything shipped that isn't the app's
@@ -306,10 +324,17 @@ updates:
     directory: "/deploy"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
 ```
 
 Only include the ecosystem blocks a repo actually uses. A Tier 1 CLI with no Docker image and no
 npm dependencies needs `github-actions` and `pip` and nothing else.
+
+**Every entry carries a `cooldown`.** A version published minutes ago is the version most likely
+to be a compromised release that gets pulled within days. `cooldown` makes Dependabot wait before
+proposing it, and security updates ignore it, so a real fix is not delayed. `zizmor` reports an
+entry without one (`dependabot-cooldown`), which is why it is in every block above.
 
 ---
 
@@ -362,6 +387,8 @@ jobs:
 ```
 
 For more than one language, use `strategy: matrix: language: [...]` instead of duplicating the job.
+Add `actions` to the list: CodeQL can analyze the workflow files themselves for injection and unsafe
+triggers, and it needs no build step (`build-mode: none`).
 Stagger the weekly `schedule` cron a few hours from Semgrep's and Trivy's own schedules (§6, §8) so
 scans don't all queue at once.
 
@@ -474,27 +501,52 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Install gitleaks
+      - name: Install gitleaks (checksum-verified)
+        env:
+          GITLEAKS_VERSION: "8.30.0"
+          # From the release's own gitleaks_<version>_checksums.txt. Update it with the version.
+          GITLEAKS_SHA256: 79a3ab579b53f71efd634f3aaf7e04a0fa0cf206b7ed434638d1547a2470a66e
         run: |
-          curl -sSL -o gitleaks.tar.gz \
-            https://github.com/gitleaks/gitleaks/releases/download/v8.30.0/gitleaks_8.30.0_linux_x64.tar.gz
-          tar -xzf gitleaks.tar.gz gitleaks
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "$archive" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum --check --strict
+          tar -xzf "$archive" gitleaks
           echo "$PWD" >> "$GITHUB_PATH"
 
       - name: Compute scan range
         id: range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "range=origin/${{ github.base_ref }}..HEAD" >> "$GITHUB_OUTPUT"
-          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-            echo "range=${{ github.event.before }}..${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "range=origin/${BASE_REF}..HEAD" >> "$GITHUB_OUTPUT"
+          elif [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            echo "range=${BEFORE_SHA}..${HEAD_SHA}" >> "$GITHUB_OUTPUT"
           else
             echo "range=-1" >> "$GITHUB_OUTPUT"
           fi
 
       - name: gitleaks (scoped to this run's commits)
-        run: gitleaks detect --source . --log-opts="${{ steps.range.outputs.range }}" --exit-code 1
+        env:
+          SCAN_RANGE: ${{ steps.range.outputs.range }}
+        run: gitleaks detect --source . --log-opts="$SCAN_RANGE" --exit-code 1
 ```
+
+Two details in this recipe are deliberate, and both were wrong in earlier versions of it:
+
+- **Context values reach the shell through `env:`, never through `${{ }}` inside `run:`.** An
+  expression inside a `run:` block is substituted into the script text before the shell parses it,
+  so a value an outsider can influence (a branch name, a PR title) becomes code. Passed as an
+  environment variable, it is only ever data. `zizmor` flags the old form as high severity
+  (`template-injection`), and §15 wires it into CI.
+- **The downloaded binary is verified against a checksum before it runs.** An unverified `curl`
+  of an executable into a CI job is the kind of unpinned dependency OpenSSF Scorecard's
+  Pinned-Dependencies check reports. Take the hash from the release's own checksums file.
 
 **Faster to wire up, but carries a known false-positive mode: the action-based minimal
 pattern.** If the range-scoped version above is more setup than a given moment allows, this
@@ -1212,3 +1264,73 @@ dependencies (an `if python_version < "3.13"` clause in some package's own metad
 using the interpreter it runs under, so compiling under a different Python version than the
 Dockerfile's base image can reproduce a lockfile that differs from the committed one for a reason
 that has nothing to do with an actual `pyproject.toml` change.
+
+---
+
+## 15. Linting workflows (actionlint and zizmor)
+
+**Why:** workflow files are code that runs with a token and, often, secrets, and almost nothing
+reads them the way a reviewer reads application code. Two linters cover different halves:
+
+- **actionlint** checks that a workflow is *correct*: valid expressions, real input names, and
+  ShellCheck on every `run:` block.
+- **zizmor** checks that it is *safe*: template injection, unpinned actions, excessive
+  permissions, cache poisoning in release jobs, credential persistence, and Dependabot config
+  without a cooldown.
+
+Neither replaces the other. Both are fast, free, and run without secrets. The lesson that put this
+recipe in the standard: this repository's own CI, copied from an earlier version of §7, carried a
+high-severity template injection that no reviewer had flagged and `zizmor` found in seconds.
+
+**When to use it:** Tier 2 and above, and worth it earlier on any repo whose workflows have grown
+past a single lint job. Start report-only if the first run finds a backlog, then make it blocking.
+
+```yaml
+# .github/workflows/ci.yml (excerpt)
+jobs:
+  lint-workflows:
+    name: Lint workflows (actionlint, zizmor)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install actionlint (checksum-verified)
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+          # From the release's own actionlint_<version>_checksums.txt. Update it with the version.
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          set -euo pipefail
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -sSfL -o "$archive" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          echo "${ACTIONLINT_SHA256}  ${archive}" | sha256sum --check --strict
+          tar -xzf "$archive" actionlint
+          echo "$PWD" >> "$GITHUB_PATH"
+
+      - name: actionlint
+        run: actionlint .github/workflows/*.yml
+
+      - uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482  # v0.6.4
+        with:
+          version: v1.30.0
+          advanced-security: false
+          annotations: true
+```
+
+Notes:
+
+- **Pin zizmor's version** with the `version:` input. The default is `latest`, which is a floating
+  reference inside an otherwise pinned step. `advanced-security: false` keeps the job at
+  `contents: read` (no SARIF upload, so no `security-events: write`); findings appear as
+  annotations instead.
+- **Run it locally first.** `zizmor .` and `actionlint` both run offline against a checkout. Add
+  `GH_TOKEN=$(gh auth token)` to `zizmor` for its online audits.
+- **The docs' own snippets are workflows too.** This repository extracts every complete workflow
+  quoted in its Markdown and runs `actionlint` on it (`scripts/check_doc_snippets.py`), because a
+  snippet that does not parse gets pasted into real repositories anyway.
+- **A finding is a fix, not a suppression.** If a `zizmor: ignore` comment is genuinely needed,
+  put the reason in the same comment.
+
+---

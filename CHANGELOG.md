@@ -36,9 +36,53 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   repositories can ignore it).
 - Convention: a CHANGELOG entry that adds or tightens a requirement carries an
   `### Adopter action` list, by tier. See AGENTS.md.
+- The playbook now holds itself to its own standard. It declares Tier 2 (a reusable workflow and
+  script that other repositories run in their own CI put it there by `docs/tiers.md`, question 2),
+  and a `self-verify` CI job runs `verify-tier` against it. Added to this repository's own CI:
+  unit tests for the scripts, `actionlint` and `zizmor` on every workflow and on the workflow
+  snippets quoted in the docs, CodeQL (JavaScript and Actions), dependency review, OSV-Scanner, an
+  OpenSSF Scorecard workflow, a hash-pinned lockfile for its one Python dependency, a
+  documentation-impact check on pull requests, `CONTRIBUTING.md`, and a pull request template.
+  Releases now carry a source archive, `SHA256SUMS`, and a signed build provenance attestation.
+- `docs/ci-cookbook.md` section 15: linting workflows with `actionlint` and `zizmor`. Tier 2 gains
+  a checklist item for it, and a second one for repositories that others consume (a GitHub
+  Release per version, with an "Adopter action" list). `verify-tier` gains a `workflow-lint`
+  check.
+- `docs/openssf.md` maps the OpenSSF Security Baseline's three levels onto the tiers and records
+  where this standard deliberately differs.
+- `docs/tiers.md`, question 2: a reusable workflow, action, or script that other repositories run
+  counts as blast radius beyond the owner, whatever its size.
+
+### Fixed
+
+- **`docs/ci-cookbook.md` section 7 (gitleaks) had a template injection.** The recipe put
+  `${{ github.base_ref }}` and other context values directly inside `run:` scripts, where they
+  are substituted into the shell text before it parses. They now reach the shell through `env:`.
+  The recipe also downloaded the gitleaks binary without verifying it; it now checks a SHA-256.
+- Section 3 (osv-scanner) called reusable workflows at a floating tag, against this standard's
+  own pinning rule, and granted `security-events: write` to the whole workflow. Both are fixed:
+  pinned to a commit SHA, permission moved to the two jobs that need it.
+- Section 4 and the Dependabot example in section 1 gained a `cooldown`, which `zizmor` reports as
+  missing.
+- `verify-tier` read `uses:` lines inside YAML comments as real steps and failed SHA-pinning on a
+  workflow whose header quoted a usage example. It now ignores comments.
+- `verify-tier` read a `Tier: N` line quoted inside a fenced code block as the repository's own
+  declaration. Fenced blocks are now ignored.
+- `verify-tier` no longer expects a `concurrency:` block on a reusable-only workflow, which takes
+  it from its caller.
+- `templates/pull_request_template.md` offered "No doc update needed (explain why)", which the
+  documentation-impact check in section 12 does not accept. It now reads
+  "No doc update needed: <state the reason>".
 
 ### Adopter action
 
+- **All tiers that copied the section 7 gitleaks recipe:** replace every `${{ ... }}` expression
+  inside its `run:` blocks with an environment variable set under `env:`, and verify the
+  downloaded binary's checksum. This is a real injection path, not a style point.
+- **Tier 2 and above:** add `actionlint` and `zizmor` to CI (section 15), and a `cooldown` to each
+  `dependabot.yml` entry. `verify-tier` warns until the linters exist.
+- **Anyone who copied the section 3 osv-scanner workflow:** pin the two `uses:` lines to a commit
+  SHA and move `security-events: write` from the top of the file to those two jobs.
 - **All tiers, repositories calling `verify-tier.yml`:** keep the `github-actions` ecosystem in
   `dependabot.yml`, so a new release arrives as a pull request. Bump the pinned SHA when it does.
 - **Tier 2 and above, public repositories:** add the OpenSSF Scorecard workflow from

@@ -12,9 +12,14 @@ repositories, keeping what worked, and being explicit about what is overkill for
 small project versus what a larger one actually needs. It is deliberately not a copy
 of any single existing repository's setup: "the most sophisticated repo in the org
 does X" is treated as one input to a tiering decision, never as the decision itself.
-This repository is itself maintained at Tier 1: small, single-purpose, one
-maintainer, which is why its own README skips the badge row and the audience-routing
-table that a larger project in this same standard would need.
+This repository is itself held to the standard at Tier 2, and its own CI enforces that:
+other repositories run its reusable workflow and script with their own tokens, so its blast
+radius is larger than its size suggests. It skips the audience-routing table that a larger
+project would need, because it has one audience and one entry point.
+
+[![CI](https://github.com/solarssk/playbook/actions/workflows/ci.yml/badge.svg)](https://github.com/solarssk/playbook/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/solarssk/playbook)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/solarssk/playbook)](https://github.com/solarssk/playbook/releases/latest)
 
 ## Table of contents
 

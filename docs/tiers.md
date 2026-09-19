@@ -26,7 +26,9 @@ Ask these questions in order. Stop at the first "yes."
 1. **Does it run as a service, ship a container image, or handle another party's credentials,
    PII, or money?** Then at least Tier 2.
 2. **Does more than one person depend on it working correctly, or does breaking it have a blast
-   radius beyond the repository owner?** Then at least Tier 2.
+   radius beyond the repository owner?** Then at least Tier 2. A reusable workflow, action, or
+   script that other repositories run in their own CI counts: it executes with their tokens, so
+   size and age do not lower its tier.
 3. **Is it a single script, a configuration file, or a narrow personal-infrastructure bridge with
    one maintainer and few or no other users?** Then Tier 1.
 4. **Is it empty, a placeholder, or pre-code?** Then Tier 0 only, until there's something to tier.
@@ -115,6 +117,10 @@ handles credentials or PII. Everything in Tier 1, plus:
 - [ ] Full CI: tests and type-checking on top of Tier 1's lint, dependency audit, and secret-scan
       steps. See [ci-cookbook.md](ci-cookbook.md).
 - [ ] SAST (CodeQL and/or Semgrep) on pull request and on a weekly schedule.
+- [ ] Workflows linted in CI with both actionlint (correctness) and zizmor (safety: template
+      injection, unpinned actions, excessive permissions). Workflow files run with a token and
+      almost nothing reviews them like code. See
+      [ci-cookbook.md](ci-cookbook.md#15-linting-workflows-actionlint-and-zizmor).
 - [ ] Dependabot covering *every* ecosystem actually in use: application dependencies,
       `github-actions`, and any Docker base image(s), including a deploy/compose stack's images
       when those are separate from the application's own `Dockerfile`. This is the single most
@@ -135,6 +141,11 @@ handles credentials or PII. Everything in Tier 1, plus:
       a release-publishing workflow must never be configured to cancel an in-progress run, only to
       queue behind it.
 - [ ] `CONTRIBUTING.md`, a pull request template, and CODEOWNERS.
+- [ ] If other repositories consume it (a reusable workflow, an action, a template set): a
+      GitHub Release per version, not just a tag, with notes that say what a repository already
+      following it must change (an "Adopter action" list). The Release is what adopters and
+      Dependabot are notified by; a bare tag notifies no one. See
+      [ci-cookbook.md](ci-cookbook.md#13-verifying-a-repo-against-this-standard-automatically).
 - [ ] A "Documentation impact" section in the PR template, checked in CI against the actual diff
       rather than trusted on its word. See
       [ci-cookbook.md](ci-cookbook.md#12-docs-as-source-of-truth-and-catching-stale-docs-at-pr-time).

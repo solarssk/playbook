@@ -1,15 +1,18 @@
 # OpenSSF: Scorecard and Best Practices badge
 
-The [Open Source Security Foundation](https://openssf.org) publishes two things a repository can
-be measured against without asking anyone's permission: **Scorecard**, an automated check of the
-repository's own supply-chain posture, and the **Best Practices badge**, a self-attested
-questionnaire. They answer different questions and belong at different tiers.
+The [Open Source Security Foundation](https://openssf.org) publishes three things a repository
+can be measured against without asking anyone's permission: **Scorecard**, an automated check of
+the repository's own supply-chain posture, the **Best Practices badge**, a self-attested
+questionnaire, and the **Security Baseline**, a catalog of controls. Scorecard and the badge
+answer different questions and belong at different tiers; the Baseline is covered
+[last](#security-baseline-osps).
 
 - [What each one is](#what-each-one-is)
 - [Tier placement](#tier-placement)
 - [Scorecard workflow](#scorecard-workflow)
 - [How to read the score](#how-to-read-the-score)
 - [Best Practices badge](#best-practices-badge)
+- [Security Baseline (OSPS)](#security-baseline-osps)
 - [What not to do](#what-not-to-do)
 
 ## What each one is
@@ -168,6 +171,36 @@ Rules for filling it in:
 ```
 
 `<project-id>` is the numeric ID assigned when the project is registered on bestpractices.dev.
+
+## Security Baseline (OSPS)
+
+The [OpenSSF Security Baseline](https://baseline.openssf.org) is a third instrument, closer in
+kind to this playbook than either of the two above: a catalog of controls for a repository, in
+three maturity levels, across access control, build and release, documentation, governance,
+legal, quality, security assessment, and vulnerability management. It is not scored by a tool.
+Read it as an independent outside check on this standard's tiers, not as a checklist to adopt
+whole.
+
+The levels line up with the tiers this way, per the Baseline version dated 2025-02-25. Recheck
+the current text before quoting a control ID, since the catalog is still being revised.
+
+| Baseline level | Roughly matches | Where this standard covers it |
+|---|---|---|
+| 1: any project with maintainers or users | Tiers 0 and 1 | Branch protection on the default branch, least-privilege `permissions:`, a license file, `SECURITY.md` with a contact, a documented contribution process, a public repository with full history |
+| 2: code projects with two or more maintainers and consistent users | Tier 2 | Required status checks before merge, automated tests in CI, a changelog per release, a private vulnerability reporting channel with a response time, signed releases or signed checksums, a stated dependency policy |
+| 3: large, consistent user base | Tier 3 | Design documentation and threat modeling for auditors, a defined remediation threshold for dependency and SAST findings, documented support windows, instructions to verify a release |
+
+Where the Baseline asks for more than this standard, the difference is deliberate:
+
+- **A non-author approval before merge** (a Level 3 control, and Scorecard's Code-Review) needs a
+  second person. A solo-maintained repository cannot meet it honestly, and adding a second
+  account to satisfy it would defeat its purpose. The standard records the gap instead
+  ([governance.md](governance.md), branch protection).
+- **Signed releases** are met at Tier 2 for repositories that other repositories consume, by a
+  build provenance attestation and a checksums file on each GitHub Release. Tier 3 adds the
+  instructions to verify one. Scorecard's own Signed-Releases check looks for a specific
+  provenance file format attached to the release, so a GitHub attestation satisfies the Baseline
+  control without necessarily raising that Scorecard check.
 
 ## What not to do
 

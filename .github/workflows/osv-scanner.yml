@@ -1,0 +1,30 @@
+name: OSV-Scanner
+
+# Known-vulnerability scan of every dependency manifest and lockfile in the
+# repository (scripts/requirements.txt) and the GitHub Actions it uses.
+on:
+  pull_request: {}
+  schedule:
+    - cron: "0 7 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  scan-pr:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      security-events: write # upload SARIF; granted to this job only
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67  # v2.5.1
+
+  scan-scheduled:
+    if: github.event_name == 'schedule'
+    permissions:
+      contents: read
+      security-events: write # upload SARIF; granted to this job only
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67  # v2.5.1
