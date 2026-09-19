@@ -111,8 +111,8 @@ at flagship scale, not picked.
   so write it for someone who has not read the rest of the entry. Omit it when nothing is
   required of adopters.
 - **A release is a tag plus a Release.** Update `CHANGELOG.md` (move `Unreleased` under the new
-  version heading) and `PLAYBOOK_RELEASE` in `.github/workflows/verify-tier.yml` in the same
-  commit, merge it, then push a `vX.Y.Z` tag on that commit. `.github/workflows/release.yml`
+  version heading), `PLAYBOOK_RELEASE`, and the literal `ref:` of the playbook checkout step, both
+  in `.github/workflows/verify-tier.yml`, in the same commit, merge it, then push a `vX.Y.Z` tag on that commit. `.github/workflows/release.yml`
   refuses to publish if the two disagree with the tag, then creates the GitHub Release from the
   CHANGELOG section. Adopters are notified through that Release, not through the tag.
 
