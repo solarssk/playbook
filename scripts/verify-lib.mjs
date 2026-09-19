@@ -43,7 +43,7 @@ export function findFloatingActionRefs(workflowText) {
 // example inside a fence, and that example must not be read as the document's
 // own declaration.
 export function detectDeclaredTier(markdown) {
-  const match = stripFencedBlocks(markdown).match(/^Tier:\s*(\d)\b/m);
+  const match = /^Tier:\s*(\d)\b/m.exec(stripFencedBlocks(markdown));
   return match ? Number(match[1]) : null;
 }
 
@@ -68,8 +68,14 @@ export function stripFencedBlocks(markdown) {
 
 // The `PLAYBOOK_RELEASE: vX.Y.Z` value from verify-tier.yml, or null.
 export function readPinnedRelease(workflowText) {
-  const match = /^\s+PLAYBOOK_RELEASE:\s*(\S+)\s*$/m.exec(stripYamlComments(workflowText));
-  return match ? match[1] : null;
+  const key = "PLAYBOOK_RELEASE:";
+  for (const line of stripYamlComments(workflowText).split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith(key)) continue;
+    const value = trimmed.slice(key.length).trim();
+    return value === "" || /\s/.test(value) ? null : value;
+  }
+  return null;
 }
 
 // The body of the `## [<version>]` section of a Keep-a-Changelog file, trimmed,
@@ -98,36 +104,56 @@ export function isReusableOnly(workflowText) {
     !/^\s{2}(push|pull_request|pull_request_target|schedule|workflow_dispatch|release|workflow_run|branch_protection_rule):/m.test(text);
 }
 
-// Static names a workflow's jobs report as check contexts, as anchored regular
-// expressions. A job reports as its `name:` when it has one, otherwise its key.
-// A name containing `${{ ... }}` (a matrix job, for instance) can only be
-// matched loosely, so its expression becomes a wildcard. A job that calls a
-// reusable workflow reports as "<its name> / <called job>". Line-based, like the
-// other helpers here: it reads the two-space job keys and four-space `name:`.
-export function reportedCheckPatterns(workflowText) {
-  const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const lines = stripYamlComments(workflowText).split("\n");
+// Strips one pair of matching quotes from a YAML scalar.
+function unquote(text) {
+  const first = text[0];
+  return text.length >= 2 && (first === '"' || first === "'") && text.at(-1) === first ? text.slice(1, -1) : text;
+}
+
+// The jobs in a workflow's `jobs:` block: each job's key, its `name:` when it
+// has one, and whether it calls a reusable workflow. Line-based, like the other
+// helpers here: it reads the two-space job keys and the four-space `name:` and
+// `uses:` beneath them.
+function parseJobs(workflowText) {
   const jobs = [];
   let inJobs = false;
-  for (const line of lines) {
+  for (const line of stripYamlComments(workflowText).split("\n")) {
     if (/^jobs:\s*$/.test(line)) {
       inJobs = true;
-    } else if (inJobs && /^\S/.test(line)) {
-      inJobs = false;
-    } else if (inJobs) {
-      const key = /^ {2}([A-Za-z0-9_-]+):\s*$/.exec(line);
-      if (key) jobs.push({ key: key[1], name: null, reusable: false });
-      const current = jobs[jobs.length - 1];
-      const name = /^ {4}name:\s*(.+?)\s*$/.exec(line);
-      if (current && name) current.name = name[1].replace(/^(["'])(.*)\1$/, "$2");
-      if (current && /^ {4}uses:/.test(line)) current.reusable = true;
+      continue;
     }
+    if (!inJobs) continue;
+    if (/^\S/.test(line)) {
+      inJobs = false;
+      continue;
+    }
+    const key = /^ {2}([A-Za-z0-9_-]+):\s*$/.exec(line);
+    if (key) {
+      jobs.push({ key: key[1], name: null, reusable: false });
+      continue;
+    }
+    const current = jobs.at(-1);
+    if (!current) continue;
+    if (line.startsWith("    name:")) current.name = unquote(line.slice("    name:".length).trim());
+    else if (line.startsWith("    uses:")) current.reusable = true;
   }
-  return jobs.map(({ key, name, reusable }) => {
-    const display = name ?? key;
-    const source = display.split(/\$\{\{[^}]*\}\}/).map(escape).join(".+");
-    return new RegExp(reusable ? `^${source}( / .+)?$` : `^${source}$`);
-  });
+  return jobs;
+}
+
+// An anchored pattern for the check name a job reports. A name containing
+// `${{ ... }}` (a matrix job, for instance) can only be matched loosely, so its
+// expression becomes a wildcard. A job that calls a reusable workflow reports as
+// "<its name> / <called job>".
+function patternFor({ key, name, reusable }) {
+  const escape = (text) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  const source = (name ?? key).split(/\$\{\{[^}]*\}\}/).map(escape).join(".+");
+  return new RegExp(reusable ? `^${source}( / .+)?$` : `^${source}$`);
+}
+
+// Static names a workflow's jobs report as check contexts, as anchored regular
+// expressions. A job reports as its `name:` when it has one, otherwise its key.
+export function reportedCheckPatterns(workflowText) {
+  return parseJobs(workflowText).map(patternFor);
 }
 
 // The required contexts that no job in the given workflow files would report.
