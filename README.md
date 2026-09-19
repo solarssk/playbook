@@ -83,9 +83,12 @@ below to go straight to the document you need.
 | [docs/tiers.md](docs/tiers.md) | The four-tier system itself: how to pick a tier, and each tier's checklist. Start here for "what does my repo actually need." |
 | [docs/readme-standard.md](docs/readme-standard.md) | How a README should be structured, section by section, per tier. This README follows it. |
 | [docs/ci-cookbook.md](docs/ci-cookbook.md) | Copy-paste CI recipes: SHA-pinning actions, concurrency groups, CodeQL, Semgrep, gitleaks, Dependabot, container scanning, Codecov, SonarCloud. |
+| [docs/openssf.md](docs/openssf.md) | OpenSSF Scorecard workflow and the Best Practices badge: which tier each belongs to, how to read the score, and what not to chase. |
+| [docs/deepwiki.md](docs/deepwiki.md) | DeepWiki: an optional generated navigation aid for public repos, why it is never the source of truth, and how to steer it. |
 | [docs/governance.md](docs/governance.md) | CODEOWNERS, branch protection, labels and milestones, and the repository settings each tier expects. |
 | [docs/security-docs.md](docs/security-docs.md) | How to write `SECURITY.md` and handle vulnerability disclosure, by tier. |
 | [templates/](templates/) | Ready-to-copy starter files: a README template, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CODEOWNERS`, and issue and pull request templates. |
+| [.github/workflows/release.yml](.github/workflows/release.yml) | Publishes a GitHub Release from the CHANGELOG when a version tag is pushed. The Release is how a repository following this standard learns a newer version exists. |
 | [.github/workflows/verify-tier.yml](.github/workflows/verify-tier.yml) | A reusable workflow another repository calls to check itself against this standard automatically, from one place. See docs/ci-cookbook.md #13. |
 
 Nothing here needs to be read end to end. Read the one document your question maps

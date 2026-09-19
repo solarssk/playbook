@@ -194,6 +194,15 @@ reader something they'd otherwise have to go find out?*
 4. **Platform support** (e.g., which container architectures are
    published): worth it specifically when it answers "will this run on my
    hardware," which is a real decision point for self-hosted software.
+5. **OpenSSF Scorecard**: at Tier 2 and above on a public repo, once the workflow has published
+   a result. Before the first run it renders as an error image. See
+   [openssf.md](openssf.md#scorecard-workflow).
+6. **OpenSSF Best Practices**: at Tier 3, only once the passing level is reached. See
+   [openssf.md](openssf.md#best-practices-badge).
+
+**Optional, never required:** the DeepWiki badge, and only after someone has read the generated
+wiki and judged it accurate. It is an endorsement of a machine-written page. See
+[deepwiki.md](deepwiki.md#adopting-it).
 
 **Usually not worth it:**
 

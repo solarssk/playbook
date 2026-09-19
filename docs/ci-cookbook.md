@@ -1090,8 +1090,9 @@ each workflow file needs its own block; a caller does not inherit or narrow the 
 
 **What it checks without any extra setup:** LICENSE, CODEOWNERS, SECURITY.md, CONTRIBUTING.md,
 issue and PR templates, SHA-pinning, `permissions:` and `concurrency:` blocks, and a handful of
-keyword-based heuristics (a secret-scan step, a dependency-audit step, SAST, a badge row). Tier is
-auto-detected from the calling repo's own `AGENTS.md`.
+keyword-based heuristics (a secret-scan step, a dependency-audit step, SAST, an OpenSSF Scorecard
+workflow, a badge row). It also reports whether a newer playbook release exists than the one the
+call is pinned to (see below). Tier is auto-detected from the calling repo's own `AGENTS.md`.
 
 **What needs `admin_token`, an optional PAT with repository administration access:**
 delete-branch-on-merge, Dependabot security-updates status, and whether branch protection exists
@@ -1099,6 +1100,26 @@ at all. Skipped and reported as skipped, not silently omitted, if the secret isn
 is the same limitation described in §12: `administration` isn't a scope a workflow's own
 `permissions:` block can grant, so there is no way to read these without a token that already has
 that access.
+
+**How a repo finds out the playbook changed.** Pinning to a SHA means nothing updates silently, so
+the notification has to be deliberate. Two mechanisms carry it, and both depend on the playbook
+publishing a real GitHub Release for every version, not just a tag:
+
+1. **A warning in the check itself.** On every run, `verify-tier` compares the release it is pinned
+   to against the playbook's latest Release. If a newer one exists, the run reports a
+   `playbook-version` warning and a workflow annotation with a link to the release notes. It
+   never fails the build: a new release must not turn every adopter's CI red at once. It is a
+   prompt to read the notes and bump the pin.
+2. **A Dependabot pull request.** If the adopting repo has the `github-actions` ecosystem in its
+   `dependabot.yml` (§4), Dependabot proposes the SHA bump on its own. It normally includes the
+   Release notes in the PR description, but confirm that on the first real bump rather than
+   relying on it; the warning in mechanism 1 does not depend on Dependabot.
+
+Either way, the thing to read is the release's **Adopter action** list: what a repository at each
+tier must change to stay in line. A release with no such list changes nothing an adopter has to do.
+
+Keep the `github-actions` Dependabot entry in any repo that calls this workflow. Without it, the
+warning in the workflow run is the only signal, and a warning nobody is looking at gets missed.
 
 A result of "pass" here means the mechanical checks for the declared tier are satisfied. It does
 not mean the repo is actually well-maintained: a keyword match for "gitleaks" doesn't confirm the
