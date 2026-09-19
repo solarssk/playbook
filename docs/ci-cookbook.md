@@ -1021,10 +1021,41 @@ Then verify, in CI, that the declaration is actually consistent with the diff in
 it on its word:
 
 ```yaml
-# .github/workflows/ci.yml (excerpt), on: pull_request
+# .github/workflows/docs-impact.yml
+name: Documentation impact
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  docs-impact:
+    name: Documentation impact declaration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: "22"
       - name: Check documentation-impact declaration
         run: node scripts/check-pr-docs-impact.mjs
 ```
+
+The `edited` trigger is the point of running this as its own workflow. The declaration lives in the
+pull request description, and a plain `pull_request` trigger only runs on opened, synchronize, and
+reopened, so a contributor who corrects the checkbox would still see a failing check until they
+push another commit. `fetch-depth: 0` is needed because the script diffs the pull request's base
+and head commits.
 
 ```javascript
 // scripts/check-pr-docs-impact.mjs

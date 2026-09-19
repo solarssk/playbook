@@ -180,8 +180,11 @@ function checkTier2() {
   record(2, "sast", "CodeQL or Semgrep configured", /codeql-action|semgrep/i.test(wf) ? "pass" : "warn",
     "No CodeQL or Semgrep reference found in any workflow.");
 
-  record(2, "workflow-lint", "A workflow linter (zizmor or actionlint) configured", /zizmor|actionlint/i.test(wf) ? "pass" : "warn",
-    "No zizmor or actionlint reference found in any workflow. They catch template injection, excessive permissions, and unpinned actions that a keyword check cannot. See docs/ci-cookbook.md #15.");
+  // Both are required: actionlint checks correctness, zizmor checks safety, and
+  // neither covers the other's half.
+  const missingLinters = ["actionlint", "zizmor"].filter((name) => !new RegExp(name, "i").test(wf));
+  record(2, "workflow-lint", "Workflows linted with both actionlint and zizmor", missingLinters.length === 0 ? "pass" : "warn",
+    `No ${missingLinters.join(" or ")} reference found in any workflow. actionlint checks correctness and zizmor checks safety (template injection, excessive permissions, unpinned actions); neither covers the other. See docs/ci-cookbook.md #15.`);
 
   record(2, "scorecard", "OpenSSF Scorecard workflow configured", /ossf\/scorecard-action/.test(wf) ? "pass" : "warn",
     "No ossf/scorecard-action reference found. Expected on public repositories only; a private repository can ignore this. See docs/openssf.md.");

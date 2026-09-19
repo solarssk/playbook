@@ -48,14 +48,15 @@ export function detectDeclaredTier(markdown) {
 }
 
 // Removes fenced code blocks, line by line. A block opens on a line starting
-// with ``` or ~~~ and closes on the next line that starts with the same marker.
+// with ``` or ~~~ (indented or not, as under a list item) and closes on the next
+// line that starts with the same marker.
 // (A single regex over the whole document backtracks super-linearly on an
 // unterminated fence; a line scan does not.)
 export function stripFencedBlocks(markdown) {
   const kept = [];
   let openMarker = null;
   for (const line of markdown.split("\n")) {
-    const marker = /^(```|~~~)/.exec(line)?.[1] ?? null;
+    const marker = /^\s*(```|~~~)/.exec(line)?.[1] ?? null;
     if (openMarker === null) {
       if (marker === null) kept.push(line);
       else openMarker = marker;

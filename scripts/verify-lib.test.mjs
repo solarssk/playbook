@@ -193,3 +193,8 @@ test("readDocsImpactDeclaration requires a real reason and rejects the template 
   assert.deepEqual(readDocsImpactDeclaration(pick(" ", "x").replace("REASON", "<state the reason>")), { docsUpdated: false, noDocsUpdate: false });
   assert.deepEqual(readDocsImpactDeclaration("nothing selected"), { docsUpdated: false, noDocsUpdate: false });
 });
+
+test("stripFencedBlocks also drops an indented fence, as under a list item", () => {
+  assert.equal(stripFencedBlocks("a\n   ```markdown\n   Tier: 3\n   ```\nb"), "a\nb");
+  assert.equal(detectDeclaredTier("1. step\n\n   ```markdown\n   Tier: 3\n   ```\n\nTier: 1\n"), 1);
+});

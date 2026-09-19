@@ -88,6 +88,13 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   whose head branch was named `dependabot/...`, which anyone can create, so it now matches the
   author only. And "No doc update needed: <state the reason>" passed with the template's own
   placeholder as the reason; a real reason is now required.
+- **The section 12b workflow did not rerun when the pull request description was edited.** The
+  recipe is now a workflow of its own that also runs on `edited`, and it is shown in full. This
+  repository's copy moved out of `ci.yml` for the same reason.
+- `verify-tier`'s `workflow-lint` check now requires both `actionlint` and `zizmor`, and names the
+  missing one; either alone used to pass.
+- `scripts/check_doc_snippets.py` and `verify-tier` now recognise fenced blocks indented under a list
+  item, which were silently skipped. The docs' own indented blocks are now validated.
 - `verify-tier` now treats a workflow as reusable-only only when `workflow_call` is its sole
   trigger, instead of checking for a fixed list of other events, and requires a reusable-workflow
   job's required check to carry its `<caller> / <called job>` suffix. It also reads a quoted
@@ -107,6 +114,9 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   release. Neither is checked automatically.
 - **All tiers:** untrusted context values reach the shell through `env:`, and downloaded binaries
   are checksum-verified (`docs/tiers.md`, Tier 1). `zizmor` at Tier 2 catches the first.
+- **Anyone who copied the section 12b documentation-impact workflow:** add `edited` to the
+  `pull_request` types (or move the job to its own workflow, as the recipe now does), so fixing the
+  checkbox reruns the check.
 - **Anyone who copied the section 12b documentation-impact script:** match the PR author
   (`dependabot[bot]`) instead of the branch name, and reject the untouched
   `<state the reason>` placeholder, as the recipe now does.

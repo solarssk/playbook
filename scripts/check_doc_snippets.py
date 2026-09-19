@@ -16,7 +16,8 @@ import sys
 
 import yaml
 
-FENCE = re.compile(r"^```(yaml|yml|json)[^\n]*\n(.*?)^```[ \t]*$", re.MULTILINE | re.DOTALL)
+# A fenced block nested under a list item is indented; the closing fence repeats the same indent.
+FENCE = re.compile(r"^([ \t]*)```(yaml|yml|json)[^\n]*\n(.*?)^\1```[ \t]*$", re.MULTILINE | re.DOTALL)
 SKIP_DIRS = {".git", "node_modules", ".snippet-workflows"}
 EXTRACT_DIR = pathlib.Path(".snippet-workflows")
 
@@ -34,7 +35,10 @@ def iter_snippets():
         text = path.read_text(encoding="utf-8")
         for index, match in enumerate(FENCE.finditer(text)):
             line = text[: match.start()].count("\n") + 1
-            yield path, line, match.group(1), match.group(2), index
+            indent, language, body = match.groups()
+            if indent:
+                body = re.sub(rf"^{re.escape(indent)}", "", body, flags=re.MULTILINE)
+            yield path, line, language, body, index
 
 
 def parse(language: str, body: str):
