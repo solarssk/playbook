@@ -38,8 +38,8 @@ The pages are generated from the code by a model. That has three consequences:
 1. **It can be wrong.** A generated page can misdescribe a flow, invent a module relationship, or
    describe behavior the code no longer has. It carries no review by the people who own the code.
 2. **It lags.** It reflects the repository as of its last index, not the current commit. The
-   automatic refresh described under [Adopting it](#adopting-it) narrows this gap but does not
-   remove it.
+   badge-triggered refresh the vendor's README mentions (see [Adopting it](#adopting-it)) is not
+   documented as a guarantee, so assume the index can be stale.
 3. **It is not in the repository.** It cannot be diffed, reviewed in a pull request, or checked
    by the documentation-impact gate in
    [ci-cookbook.md #12](ci-cookbook.md#12-docs-as-source-of-truth-and-catching-stale-docs-at-pr-time).
@@ -66,10 +66,11 @@ generated page.
 4. Optionally add `.devin/wiki.json` (next section) if the default structure is poor.
 
 Skip the badge if the generated wiki has not been read and judged accurate. A badge is an
-endorsement. It also has a side effect worth knowing: the service refreshes the wikis of
-repositories that carry its badge automatically, so adding the badge is what keeps the generated
-pages from lagging far behind the code. A repository that wants the wiki available but not
-advertised can leave the badge out and accept a staler index.
+endorsement. The vendor's own README says it auto-refreshes the wikis of repositories that carry
+the badge, but its product documentation describes indexing and regeneration through its own
+settings and does not mention the badge as a trigger. Treat freshness as not guaranteed either
+way: the badge does not make the generated pages current, and a repository that needs a fresh
+index should re-index it from the service.
 
 ## Steering the generated wiki
 

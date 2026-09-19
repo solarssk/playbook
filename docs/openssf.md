@@ -55,7 +55,7 @@ on:
   schedule:
     - cron: "0 4 * * 3"
   push:
-    branches: [main]
+    branches: [<default-branch>] # replace with this repository's default branch
 
 # Deny-all at the top; the job below grants only what it needs. Scorecard's
 # Token-Permissions check requires a top-level `permissions:` key to exist.
@@ -129,6 +129,7 @@ number on the page. Read the individual checks.
 | Security-Policy | `SECURITY.md` |
 | Dependency-Update-Tool | `dependabot.yml` |
 | License | `LICENSE` |
+| CI-Tests | Tier 2's "tests in CI" item: tests run on pull requests |
 
 **Checks that measure project shape, not hygiene.** A solo-maintained repository will score low
 on these no matter how careful it is, and that is not a defect to fix:
@@ -136,7 +137,7 @@ on these no matter how careful it is, and that is not a defect to fix:
 - **Code-Review** counts changes approved by someone other than the author. With one
   maintainer there is no one to approve. Do not add a second account to move it.
 - **Contributors** counts distinct contributing organizations.
-- **Maintained** and **CI-Tests** reflect activity and are fine on any live repository.
+- **Maintained** reflects commit activity and is fine on any live repository.
 - **Signed-Releases**, **Fuzzing**, and **CII-Best-Practices** are opt-in investments. Adopt
   one when it does real work for the repository, not to raise the average.
 

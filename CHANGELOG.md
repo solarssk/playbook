@@ -20,8 +20,9 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   Derived from a Tier 3 repository already running both.
 - `docs/deepwiki.md`: DeepWiki as an optional navigation aid for public Tier 2+ repositories.
   It is not a checklist item and `verify-tier` does not check for it. Records why generated
-  pages are never a source of truth or a security citation, that the vendor auto-refreshes
-  wikis of repositories carrying its badge, a valid `.devin/wiki.json`, and how agents should
+  pages are never a source of truth or a security citation, that freshness is not guaranteed
+  (the vendor's README claims a badge-triggered refresh its product docs do not), a valid
+  `.devin/wiki.json`, and how agents should
   treat answers from its MCP server (a lead to verify, not a fact).
 - README badge guidance (`docs/readme-standard.md`) covers the Scorecard, Best Practices, and
   DeepWiki badges.
