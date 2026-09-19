@@ -10,6 +10,43 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 
 ## [Unreleased]
 
+### Added
+
+- `docs/openssf.md`: OpenSSF Scorecard and Best Practices badge. Tier 2 gains a report-only
+  Scorecard workflow (public repositories) and its badge; Tier 3 gains the Best Practices badge
+  at the passing level. Includes a copy-paste workflow, how to read the score (which checks
+  map to existing standard items versus which measure team size, such as Code-Review), and an
+  explicit rule that neither is a merge gate and no control is added only to move a score.
+  Derived from a Tier 3 repository already running both.
+- `docs/deepwiki.md`: DeepWiki as an optional navigation aid for public Tier 2+ repositories.
+  It is not a checklist item and `verify-tier` does not check for it. Records why generated
+  pages are never a source of truth or a security citation, that freshness is not guaranteed
+  (the vendor's README claims a badge-triggered refresh its product docs do not), a valid
+  `.devin/wiki.json`, and how agents should
+  treat answers from its MCP server (a lead to verify, not a fact).
+- README badge guidance (`docs/readme-standard.md`) covers the Scorecard, Best Practices, and
+  DeepWiki badges.
+- Release notification for adopters. `verify-tier` now warns (never fails) when the playbook has
+  published a newer GitHub Release than the one the caller is pinned to, with an annotation
+  linking to the release notes. New `.github/workflows/release.yml` publishes a GitHub Release
+  from the CHANGELOG section when a `vX.Y.Z` tag is pushed, and refuses to if `PLAYBOOK_RELEASE`
+  or the CHANGELOG heading disagree with the tag. Those Release notes are also what Dependabot
+  usually puts in the PR that bumps a caller's pinned SHA. See `docs/ci-cookbook.md` #13.
+- `verify-tier` Tier 2 check for an OpenSSF Scorecard workflow (warning only; private
+  repositories can ignore it).
+- Convention: a CHANGELOG entry that adds or tightens a requirement carries an
+  `### Adopter action` list, by tier. See AGENTS.md.
+
+### Adopter action
+
+- **All tiers, repositories calling `verify-tier.yml`:** keep the `github-actions` ecosystem in
+  `dependabot.yml`, so a new release arrives as a pull request. Bump the pinned SHA when it does.
+- **Tier 2 and above, public repositories:** add the OpenSSF Scorecard workflow from
+  `docs/openssf.md` and, once it has run, its README badge. `verify-tier` warns until it exists.
+- **Tier 3:** reach the OpenSSF Best Practices badge at the passing level. Not checked
+  automatically.
+- **DeepWiki:** nothing required. Optional, see `docs/deepwiki.md`.
+
 ## [0.1.2] - 2026-09-08
 
 ### Added

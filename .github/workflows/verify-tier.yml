@@ -29,13 +29,18 @@ name: Verify tier
 # added by the pointer block documented in this repo's AGENTS.md) unless the
 # `tier` input below overrides it.
 #
-# PLAYBOOK_RELEASE below must be bumped by hand alongside every tag: there is
-# no reliable way to read back "the ref the caller used to invoke this
-# workflow" from inside a `workflow_call` job (github.action_ref tracks the
-# most recently *run action step*, not the calling ref -- confirmed the hard
-# way, by a real cross-repo run picking up actions/checkout's own SHA
-# instead). Hardcoding it here, checked out explicitly below, means the
-# script that runs always matches this exact version of this exact file.
+# PLAYBOOK_RELEASE below is bumped in the same commit as the CHANGELOG entry
+# for every release, and release.yml refuses to publish a tag that disagrees
+# with it. It is hardcoded because there is no reliable way to read back "the
+# ref the caller used to invoke this workflow" from inside a `workflow_call`
+# job (github.action_ref tracks the most recently *run action step*, not the
+# calling ref -- confirmed the hard way, by a real cross-repo run picking up
+# actions/checkout's own SHA instead). Checked out explicitly below, it means
+# the script that runs always matches this exact version of this exact file.
+#
+# The same value is what the run compares against the playbook's latest
+# GitHub Release, to warn a caller that a newer version exists (see
+# docs/ci-cookbook.md #13).
 
 on:
   workflow_call:
@@ -87,4 +92,5 @@ jobs:
           INPUT_TIER: ${{ inputs.tier }}
           ADMIN_TOKEN: ${{ secrets.admin_token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}  # read-only lookup of the latest playbook release
         run: node .playbook-tools/scripts/verify-tier.mjs

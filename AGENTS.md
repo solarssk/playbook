@@ -88,6 +88,17 @@ have to re-derive the tier from scratch.
 - **Update [CHANGELOG.md](CHANGELOG.md)** for any change that alters what the standard actually
   recommends, not for typo fixes. Repositories that adopted an earlier version benefit from being
   able to see what changed and why.
+- **Say what adopters must do.** When a change adds or tightens a requirement, put an
+  `### Adopter action` list in that release's CHANGELOG entry, by tier: what a repository already
+  following the standard has to change to keep following it. That section is published verbatim as
+  the GitHub Release notes and shows up in adopters' Dependabot PRs and `verify-tier` warnings,
+  so write it for someone who has not read the rest of the entry. Omit it when nothing is
+  required of adopters.
+- **A release is a tag plus a Release.** Update `CHANGELOG.md` (move `Unreleased` under the new
+  version heading) and `PLAYBOOK_RELEASE` in `.github/workflows/verify-tier.yml` in the same
+  commit, merge it, then push a `vX.Y.Z` tag on that commit. `.github/workflows/release.yml`
+  refuses to publish if the two disagree with the tag, then creates the GitHub Release from the
+  CHANGELOG section. Adopters are notified through that Release, not through the tag.
 
 ## Agent-instruction files across tools
 
@@ -117,10 +128,13 @@ any one of them is updated.
 | [docs/tiers.md](docs/tiers.md) | The tier system. Start here for "what does my repo need" |
 | [docs/readme-standard.md](docs/readme-standard.md) | How a README should be structured, per tier |
 | [docs/ci-cookbook.md](docs/ci-cookbook.md) | Copy-paste recipes: CodeQL, Semgrep, gitleaks, Dependabot, Trivy, Codecov, SonarCloud, concurrency, SHA-pinning |
+| [docs/openssf.md](docs/openssf.md) | OpenSSF Scorecard (Tier 2, report-only) and the Best Practices badge (Tier 3, passing level) |
+| [docs/deepwiki.md](docs/deepwiki.md) | DeepWiki: optional, public repos only, a navigation aid and never a source of truth or a citation |
 | [docs/governance.md](docs/governance.md) | CODEOWNERS, branch protection, labels/milestones, repo settings |
 | [docs/security-docs.md](docs/security-docs.md) | How to write SECURITY.md and handle vulnerability disclosure |
 | [templates/](templates/) | Ready-to-copy starter files |
 | [.github/workflows/verify-tier.yml](.github/workflows/verify-tier.yml) | A reusable workflow another repo calls to check itself against this standard automatically. See docs/ci-cookbook.md #13 |
+| [.github/workflows/release.yml](.github/workflows/release.yml) | Publishes a GitHub Release from the CHANGELOG when a `vX.Y.Z` tag is pushed; this is how adopters learn a new version exists |
 
 ## Conventions for this repo's own commits and PRs
 

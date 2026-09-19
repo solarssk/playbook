@@ -117,6 +117,64 @@ function checkTier1() {
     "No pip-audit/npm audit/osv-scanner reference found. See docs/ci-cookbook.md #3.");
 }
 
+// ---------- playbook version drift ----------
+
+function parseVersion(tag) {
+  const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(tag ?? "");
+  return match ? match.slice(1).map(Number) : null;
+}
+
+function isNewer(candidate, current) {
+  for (let i = 0; i < 3; i += 1) {
+    if (candidate[i] !== current[i]) return candidate[i] > current[i];
+  }
+  return false;
+}
+
+// Tells an adopting repo when the playbook has published a newer release than
+// the one it is pinned to. The version this script runs at IS the version the
+// caller pinned (see PLAYBOOK_RELEASE in verify-tier.yml). This warns and never
+// fails: a new release must not turn every adopter's CI red at once. It is a
+// prompt to read the release notes and bump the pin, not a compliance verdict.
+async function checkPlaybookVersion() {
+  const label = "Pinned to the latest playbook release";
+  const current = process.env.PLAYBOOK_RELEASE;
+  const currentParts = parseVersion(current);
+  if (!currentParts) {
+    record(0, "playbook-version", label, "skip",
+      "PLAYBOOK_RELEASE is not set to a vX.Y.Z tag (running outside the reusable workflow?), so version drift was not checked.");
+    return;
+  }
+  try {
+    const headers = { Accept: "application/vnd.github+json" };
+    if (process.env.GH_TOKEN) headers.Authorization = `Bearer ${process.env.GH_TOKEN}`;
+    const response = await fetch("https://api.github.com/repos/solarssk/playbook/releases/latest", {
+      headers,
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) throw new Error(`GET releases/latest: ${response.status}`);
+    const latest = await response.json();
+    const latestParts = parseVersion(latest.tag_name);
+    if (!latestParts) throw new Error("latest release tag is not in vX.Y.Z form");
+
+    if (isNewer(latestParts, currentParts)) {
+      // Built only from parsed numbers and a fixed URL prefix, never from raw
+      // API text: this string reaches stdout, where GitHub interprets `::`
+      // lines as workflow commands, so nothing from the response may be echoed.
+      const pinnedTag = `v${currentParts.join(".")}`;
+      const latestTag = `v${latestParts.join(".")}`;
+      const detail = `This repo is pinned to playbook ${pinnedTag}; ${latestTag} is available. ` +
+        `Read the release notes (https://github.com/solarssk/playbook/releases/tag/${latestTag}), apply any "Adopter action" items, then bump the pin in the verify-standard workflow.`;
+      record(0, "playbook-version", label, "warn", detail);
+      console.log(`::warning title=Newer playbook release available::${detail}`);
+    } else {
+      record(0, "playbook-version", label, "pass");
+    }
+  } catch (error) {
+    record(0, "playbook-version", label, "skip", `Could not check for a newer release: ${error.message}`);
+  }
+}
+
 // ---------- Tier 2 ----------
 
 function checkTier2() {
@@ -138,6 +196,9 @@ function checkTier2() {
 
   record(2, "sast", "CodeQL or Semgrep configured", /codeql-action|semgrep/i.test(wf) ? "pass" : "warn",
     "No CodeQL or Semgrep reference found in any workflow.");
+
+  record(2, "scorecard", "OpenSSF Scorecard workflow configured", /ossf\/scorecard-action/.test(wf) ? "pass" : "warn",
+    "No ossf/scorecard-action reference found. Expected on public repositories only; a private repository can ignore this. See docs/openssf.md.");
 
   // Matches both Markdown image syntax (![alt](url)) and an HTML <img> tag
   // (a common pattern for a centered badge row), as long as the URL looks
@@ -224,6 +285,7 @@ if (declaredTier === null) {
 }
 
 await checkSettings(process.env.ADMIN_TOKEN);
+await checkPlaybookVersion();
 checkTier0();
 if (declaredTier >= 1) checkTier1();
 if (declaredTier >= 2) checkTier2();

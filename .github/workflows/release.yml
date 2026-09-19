@@ -1,0 +1,66 @@
+name: Release
+
+# Publishes a GitHub Release when a version tag is pushed. The Release is what
+# tells adopting repositories a new version exists: verify-tier.mjs asks the
+# API for the latest Release and warns when a caller is pinned to an older one,
+# and Dependabot (github-actions ecosystem) uses the same Release notes as the
+# body of the PR that bumps a caller's pinned SHA. A bare tag does neither.
+#
+# Before publishing, this checks the two things that have drifted by hand:
+#   1. PLAYBOOK_RELEASE in verify-tier.yml equals the tag being released.
+#   2. CHANGELOG.md has a section for this exact version, which becomes the
+#      Release notes.
+#
+# To release: update CHANGELOG.md and PLAYBOOK_RELEASE in one commit, merge it,
+# then tag that commit `vX.Y.Z` and push the tag.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+# Never cancel a release mid-flight, only queue behind it (docs/ci-cookbook.md #2b).
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub Release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the tag against the repository's own files
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+
+          pinned="$(sed -n 's/^  PLAYBOOK_RELEASE: *//p' .github/workflows/verify-tier.yml | tr -d '[:space:]')"
+          if [ "$pinned" != "$TAG" ]; then
+            echo "::error::PLAYBOOK_RELEASE in verify-tier.yml is '$pinned' but the tag is '$TAG'. Bump it in the release commit and re-tag."
+            exit 1
+          fi
+
+          awk -v heading="## [$version]" '
+            index($0, heading) == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if ! grep -q '[^[:space:]]' release-notes.md; then
+            echo "::error::CHANGELOG.md has no non-empty '## [$version]' section. Move the Unreleased notes under that heading."
+            exit 1
+          fi
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" --title "$TAG" --notes-file release-notes.md --verify-tag

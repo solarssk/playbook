@@ -144,6 +144,13 @@ handles credentials or PII. Everything in Tier 1, plus:
       not merely present as unenforced workflow files.
 - [ ] A README badge row: CI status, license, latest release, and container platforms if
       applicable.
+- [ ] On public repositories, an OpenSSF Scorecard workflow, report-only, plus its badge once the
+      first run has published a result. Most of what Scorecard scores is already on this list, so
+      it is an independent check of existing items, not a new burden. See
+      [openssf.md](openssf.md).
+
+Optional at this tier, not a checklist item: a DeepWiki index of a public repository. See
+[deepwiki.md](deepwiki.md) for why it is a navigation aid and never documentation.
 
 ## Tier 3: flagship
 
@@ -173,6 +180,9 @@ Tier 2, plus:
       [ci-cookbook.md](ci-cookbook.md#12-docs-as-source-of-truth-and-catching-stale-docs-at-pr-time)
       for why this can't be a PR-time check and what to do instead.
 - [ ] Per-version release notes, not just an aggregate CHANGELOG.
+- [ ] The OpenSSF Best Practices badge at the **passing** level, with every answer verifiable
+      from the repository. Not silver or gold, and not an in-progress badge. See
+      [openssf.md](openssf.md#best-practices-badge).
 
 Nothing above this tier is defined here on purpose. If a repository's needs genuinely exceed Tier
 3, that's a specific decision about that specific repository, not a fifth tier to template in
