@@ -9,3 +9,8 @@ updates:
     # updates ignore the cooldown.
     cooldown:
       default-days: 7
+    # init and analyze must stay on the same version, so they update as one PR.
+    groups:
+      codeql-action:
+        patterns:
+          - "github/codeql-action/*"
