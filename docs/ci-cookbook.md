@@ -688,7 +688,7 @@ lines once `pytest --cov`/`vitest --coverage`/equivalent is already producing a 
       - name: Upload coverage to Codecov
         # Fork and Dependabot PRs can't read repo secrets; tests still run either way.
         if: ${{ env.CODECOV_TOKEN != '' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5  # v7.1.1
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
@@ -797,6 +797,12 @@ sonar.python.coverage.reportPaths=coverage.xml
 sonar.python.xunit.reportPath=junit.xml
 ```
 
+If the organization key should not live in the repository, leave `sonar.organization` out of this
+file and pass it from a repository variable instead: set `SONAR_ORGANIZATION` under **Settings →
+Secrets and variables → Actions → Variables**, and give the scan step `args:
+-Dsonar.organization=${{ env.SONAR_ORGANIZATION }}` with `SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}`
+in its `env:`. A variable is not a secret, but it is not published with the repository either.
+
 For a JS/TS project, replace the two `sonar.python.*` lines with
 `sonar.javascript.lcov.reportPaths=path/to/lcov.info` (accepts a comma-separated list for a
 monorepo with several workspaces). `sonar.sources` and `sonar.tests` never accept wildcards, under
@@ -821,7 +827,7 @@ either analysis mode. List real paths, not a glob.
       # read SONAR_TOKEN.
       - name: SonarCloud scan
         if: ${{ env.SONAR_TOKEN != '' }}
-        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f  # v8.2.1
+        uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4  # v8.2.2
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io

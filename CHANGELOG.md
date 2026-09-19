@@ -10,6 +10,13 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 
 ## [Unreleased]
 
+### Changed
+
+- `docs/ci-cookbook.md` sections 9 and 10 recommend `codecov/codecov-action` v7.1.1 and
+  `SonarSource/sonarqube-scan-action` v8.2.2 (v7.0.0 and v8.2.1 before), and section 10 shows how to
+  keep the SonarCloud organization key out of the repository by passing it from a repository
+  variable.
+
 ### Added
 
 - `docs/openssf.md`: OpenSSF Scorecard and Best Practices badge. Tier 2 gains a report-only
