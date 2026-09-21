@@ -201,25 +201,29 @@ test("verify-tier reads the tier from AGENTS.md, and refuses to guess without on
   assert.match(none.err, /Could not determine a tier/);
 });
 
-const REPO_OK = { default_branch: "main", delete_branch_on_merge: true, security_and_analysis: { dependabot_security_updates: { status: "enabled" } } };
+const REPO_OK = { delete_branch_on_merge: true, security_and_analysis: { dependabot_security_updates: { status: "enabled" } } };
 
-function settings(routes) {
-  return run("verify-tier.mjs", { env: { INPUT_TIER: "0", ADMIN_TOKEN: "token", GITHUB_REPOSITORY: "o/r", MOCK_FETCH: JSON.stringify(routes) }, mock: true });
+// The GraphQL reply for the default branch: a protection rule with these required checks, or none.
+const protectionReply = (contexts) => ({ body: { data: { repository: { defaultBranchRef: { branchProtectionRule: contexts === null ? null : { requiredStatusCheckContexts: contexts } } } } } });
+
+function settings(routes, extraEnv = {}) {
+  return run("verify-tier.mjs", { env: { INPUT_TIER: "0", ADMIN_TOKEN: "token", GITHUB_REPOSITORY: "o/r", MOCK_FETCH: JSON.stringify(routes), ...extraEnv }, mock: true });
 }
 
 test("verify-tier reports required checks, and sanitizes a hostile name from the API", () => {
-  const result = settings({ "repos/o/r": { body: REPO_OK }, "branches/main/protection": { body: { required_status_checks: { contexts: ["lint-markdown", "<b>evil|x"] } } } });
+  const result = settings({ "repos/o/r": { body: REPO_OK }, "graphql": protectionReply(["lint-markdown", "<b>evil|x"]) });
   assert.equal(result.code, 0);
   // Only the hostile name matches no job; lint-markdown does, and a passing check prints no detail.
   assert.match(result.out, /No workflow job reports as: \?b\?evil\?x\. A required check/);
   assert.doesNotMatch(result.out, /<b>|evil\|x/);
 });
 
-test("verify-tier handles no protection, an API error, and a missing analysis section", () => {
-  assert.match(settings({ "repos/o/r": { body: REPO_OK }, "branches/main/protection": { status: 404 } }).out, /No branch protection configured/);
+test("verify-tier handles no protection, API errors, and a missing analysis section", () => {
+  assert.match(settings({ "repos/o/r": { body: REPO_OK }, graphql: protectionReply(null) }).out, /No branch protection configured/);
   assert.match(settings({ "repos/o/r": { status: 500 } }).out, /Could not complete: GET \/repos\/o\/r: 500/);
-  assert.match(settings({ "repos/o/r": { body: REPO_OK }, "branches/main/protection": { status: 500 } }).out, /Could not complete/);
-  assert.match(settings({ "repos/o/r": { body: { default_branch: "main" } }, "branches/main/protection": { status: 404 } }).out, /security_and_analysis not present/);
+  assert.match(settings({ "repos/o/r": { body: REPO_OK }, graphql: { status: 500 } }).out, /Could not complete: POST graphql: 500/);
+  assert.match(settings({ "repos/o/r": { body: REPO_OK }, graphql: { body: { errors: [{ message: "x" }] } } }).out, /the branch protection query returned errors/);
+  assert.match(settings({ "repos/o/r": { body: {} }, graphql: protectionReply(null) }).out, /security_and_analysis not present/);
 });
 
 test("verify-tier skips the settings checks without an admin token", () => {
@@ -242,4 +246,26 @@ test("verify-tier stays quiet when the pin is current, and skips when it cannot 
   assert.match(versionCheck("v1.0.0", { "releases/latest": { status: 404 } }).out, /Could not check for a newer release/);
   assert.match(versionCheck("v1.0.0", {}).out, /Could not check for a newer release/);
   assert.match(versionCheck("main", {}).out, /PLAYBOOK_RELEASE is not set to a vX\.Y\.Z tag/);
+});
+
+test("verify-tier writes nothing that came from the network into the step-summary file", () => {
+  const summary = join(fixture(), "summary.md");
+  const routes = {
+    "repos/o/r": { body: { ...REPO_OK, security_and_analysis: { dependabot_security_updates: { status: "<i>weird</i>" } } } },
+    "graphql": protectionReply(["<b>evil|x"]),
+    "releases/latest": { body: { tag_name: "v9.0.0" } },
+  };
+  const result = settings(routes, { PLAYBOOK_RELEASE: "v0.1.0", GITHUB_STEP_SUMMARY: summary });
+  const file = readFileSync(summary, "utf8");
+  assert.doesNotMatch(file, /evil|weird|v9\.0\.0/);
+  assert.match(file, /The job log lists them/);
+  assert.match(file, /The job log names it/);
+  // The job log still gets the detail, sanitized.
+  assert.match(result.out, /No workflow job reports as: \?b\?evil\?x/);
+  assert.match(result.out, /Status: \?i\?weird\?\/i\?/);
+});
+
+test("verify-tier rejects a repository name that could change the request path", () => {
+  assert.match(settings({}, { GITHUB_REPOSITORY: "o/../x" }).out, /GITHUB_REPOSITORY is not an owner\/repository name/);
+  assert.match(settings({}, { GITHUB_REPOSITORY: "o/r?x=1" }).out, /GITHUB_REPOSITORY is not an owner\/repository name/);
 });

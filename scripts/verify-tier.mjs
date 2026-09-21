@@ -13,16 +13,19 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { detectDeclaredTier as tierFromMarkdown, escapeTableCell, findFloatingActionRefs, isNewer, isReusableOnly, parseVersion, unmatchedRequiredContexts, untrustedText } from "./verify-lib.mjs";
+import { detectDeclaredTier as tierFromMarkdown, escapeTableCell, findFloatingActionRefs, isNewer, isReusableOnly, parseRepoSlug, parseVersion, unmatchedRequiredContexts, untrustedText } from "./verify-lib.mjs";
 
 const repoRoot = process.cwd();
 const results = []; // { tier, id, label, status: "pass"|"fail"|"warn"|"skip", detail }
 
-function record(tier, id, label, status, detail = "") {
+// `detail` is written to the step-summary file, so it never contains text that came from the
+// network. `logDetail` may, and goes to the job log only. It defaults to `detail`.
+function record(tier, id, label, status, detail = "", logDetail = detail) {
   // The detail argument is documentation of *why a check would fail or warn*;
   // showing it next to a passing result reads as a contradiction ("pass: X is
   // missing"). Only surface it when the check didn't cleanly pass.
-  results.push({ tier, id, label, status, detail: status === "pass" ? "" : detail });
+  const clean = status === "pass";
+  results.push({ tier, id, label, status, detail: clean ? "" : detail, logDetail: clean ? "" : logDetail });
 }
 
 function fileExists(...candidates) {
@@ -146,13 +149,15 @@ async function checkPlaybookVersion() {
       const latestTag = `v${latestParts.join(".")}`;
       const detail = `This repo is pinned to playbook ${pinnedTag}; ${latestTag} is available. ` +
         `Read the release notes (https://github.com/solarssk/playbook/releases/tag/${latestTag}), apply any "Adopter action" items, then bump the pin in the verify-standard workflow.`;
-      record(0, "playbook-version", label, "warn", detail);
+      record(0, "playbook-version", label, "warn",
+        "A newer playbook release exists than the one this repository is pinned to. The job log names it and links its release notes.", detail);
       console.log(`::warning title=Newer playbook release available::${detail}`);
     } else {
       record(0, "playbook-version", label, "pass");
     }
   } catch (error) {
-    record(0, "playbook-version", label, "skip", `Could not check for a newer release: ${untrustedText(error.message)}`);
+    record(0, "playbook-version", label, "skip", "Could not check for a newer release. The job log has the reason.",
+      `Could not check for a newer release: ${untrustedText(error.message)}`);
   }
 }
 
@@ -174,7 +179,9 @@ function checkTier2() {
   const triggerable = listWorkflowFiles().filter((file) => !isReusableOnly(readFileSync(file, "utf8")));
   const concurrencyBlocks = triggerable.filter((file) => /^concurrency:/m.test(readFileSync(file, "utf8"))).length;
   const workflowCount = triggerable.length;
-  record(2, "concurrency", "`concurrency:` groups present on workflows", workflowCount === 0 ? "skip" : concurrencyBlocks >= workflowCount ? "pass" : "warn",
+  let concurrencyStatus = "skip";
+  if (workflowCount > 0) concurrencyStatus = concurrencyBlocks >= workflowCount ? "pass" : "warn";
+  record(2, "concurrency", "`concurrency:` groups present on workflows", concurrencyStatus,
     `${concurrencyBlocks}/${workflowCount} workflow files declare a top-level concurrency: block. See docs/ci-cookbook.md #2.`);
 
   record(2, "sast", "CodeQL or Semgrep configured", /codeql-action|semgrep/i.test(wf) ? "pass" : "warn",
@@ -221,8 +228,56 @@ function checkTier3() {
 
 // ---------- settings-level checks (need an admin-scoped token) ----------
 
+function checkRepository(repo) {
+  record(0, "delete-branch-on-merge", "Automatically delete head branches enabled",
+    repo.delete_branch_on_merge ? "pass" : "warn",
+    repo.delete_branch_on_merge ? "" : "delete_branch_on_merge is false. This can be a deliberate choice (see docs/tiers.md, Tier 0); confirm it's documented if so.");
+
+  const status = repo.security_and_analysis?.dependabot_security_updates?.status;
+  if (!status) {
+    record(0, "dependabot-security-updates", "Dependabot security updates enabled", "warn",
+      "security_and_analysis not present in the response (needs org owner/security-manager access, not just repo admin, in some org configurations).");
+    return;
+  }
+  record(0, "dependabot-security-updates", "Dependabot security updates enabled", status === "enabled" ? "pass" : "warn",
+    "Dependabot security updates are not enabled. The job log has the reported status.", `Status: ${untrustedText(status)}.`);
+}
+
+// The required status checks of the default branch's protection rule, or null when there is none.
+// A GraphQL query to a fixed URL resolves the default branch on GitHub's side, so no branch name
+// from a response is ever put into a request path.
+async function requiredStatusChecks(slug, headers) {
+  const query = "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){defaultBranchRef{branchProtectionRule{requiredStatusCheckContexts}}}}";
+  const response = await fetch("https://api.github.com/graphql", {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables: { owner: slug.owner, name: slug.repo } }),
+  });
+  if (!response.ok) throw new Error(`POST graphql: ${response.status}`);
+  const payload = await response.json();
+  if (payload.errors) throw new Error("the branch protection query returned errors");
+  const rule = payload.data?.repository?.defaultBranchRef?.branchProtectionRule;
+  return rule ? (rule.requiredStatusCheckContexts ?? []) : null;
+}
+
+function checkProtection(contexts) {
+  if (contexts === null) {
+    record(0, "branch-protection", "Branch protection enabled on the default branch", "warn",
+      "No branch protection configured on the default branch.");
+    return;
+  }
+  record(0, "branch-protection", "Branch protection enabled on the default branch", "pass");
+
+  const unmatched = unmatchedRequiredContexts(contexts, listWorkflowFiles().map((file) => readFileSync(file, "utf8")));
+  const why = "A required check that never reports blocks every pull request with no error. " +
+    "A context posted by an external app (SonarCloud, for example) is expected here; a mistyped job name is not. See docs/governance.md, branch protection.";
+  record(0, "required-check-names", "Every required status check matches a workflow job's reported name",
+    unmatched.length === 0 ? "pass" : "warn",
+    `Some required status checks match no workflow job's reported name. The job log lists them. ${why}`,
+    `No workflow job reports as: ${unmatched.map((context) => untrustedText(context)).join(", ")}. ${why}`);
+}
+
 async function checkSettings(token) {
-  const repoSlug = process.env.GITHUB_REPOSITORY;
   if (!token) {
     record(0, "settings", "Repo-settings checks (delete-branch-on-merge, Dependabot, branch protection)", "skip",
       "No admin_token secret provided to this workflow call, so repo-settings checks were skipped, not failed. See docs/ci-cookbook.md #12 for why this needs an admin-scoped token rather than the default GITHUB_TOKEN.");
@@ -230,42 +285,17 @@ async function checkSettings(token) {
   }
   const headers = { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" };
   try {
-    const repoResponse = await fetch(`https://api.github.com/repos/${repoSlug}`, { headers });
-    if (!repoResponse.ok) throw new Error(`GET /repos/${repoSlug}: ${repoResponse.status}`);
-    const repo = await repoResponse.json();
-
-    record(0, "delete-branch-on-merge", "Automatically delete head branches enabled",
-      repo.delete_branch_on_merge ? "pass" : "warn",
-      repo.delete_branch_on_merge ? "" : "delete_branch_on_merge is false. This can be a deliberate choice (see docs/tiers.md, Tier 0); confirm it's documented if so.");
-
-    const dependabotStatus = repo.security_and_analysis?.dependabot_security_updates?.status;
-    record(0, "dependabot-security-updates", "Dependabot security updates enabled",
-      dependabotStatus === "enabled" ? "pass" : "warn",
-      dependabotStatus ? `Status: ${untrustedText(dependabotStatus)}.` : "security_and_analysis not present in the response (needs org owner/security-manager access, not just repo admin, in some org configurations).");
-
-    const protectionResponse = await fetch(
-      `https://api.github.com/repos/${repoSlug}/branches/${repo.default_branch}/protection`,
-      { headers },
-    );
-    if (protectionResponse.status === 404) {
-      record(0, "branch-protection", "Branch protection enabled on the default branch", "warn",
-        "No branch protection configured on the default branch.");
-    } else if (protectionResponse.ok) {
-      const protection = await protectionResponse.json();
-      const contexts = protection.required_status_checks?.contexts ?? [];
-      record(0, "branch-protection", "Branch protection enabled on the default branch", "pass",
-        `Required status checks: ${contexts.length ? contexts.map((context) => untrustedText(context)).join(", ") : "(none declared)"}.`);
-
-      const unmatched = unmatchedRequiredContexts(contexts, listWorkflowFiles().map((file) => readFileSync(file, "utf8")));
-      record(0, "required-check-names", "Every required status check matches a workflow job's reported name",
-        unmatched.length === 0 ? "pass" : "warn",
-        `No workflow job reports as: ${unmatched.map((context) => untrustedText(context)).join(", ")}. A required check that never reports blocks every pull request with no error. ` +
-          "A context posted by an external app (SonarCloud, for example) is expected here; a mistyped job name is not. See docs/governance.md, branch protection.");
-    } else {
-      throw new Error(`GET branch protection: ${protectionResponse.status}`);
-    }
+    // The host is fixed and the repository name, which comes from the environment, is validated
+    // before it is used in the path.
+    const slug = parseRepoSlug(process.env.GITHUB_REPOSITORY);
+    if (slug === null) throw new Error("GITHUB_REPOSITORY is not an owner/repository name");
+    const repoResponse = await fetch(`https://api.github.com/repos/${slug.owner}/${slug.repo}`, { headers });
+    if (!repoResponse.ok) throw new Error(`GET /repos/${slug.owner}/${slug.repo}: ${repoResponse.status}`);
+    checkRepository(await repoResponse.json());
+    checkProtection(await requiredStatusChecks(slug, headers));
   } catch (error) {
-    record(0, "settings", "Repo-settings checks", "warn", `Could not complete: ${untrustedText(error.message)}`);
+    record(0, "settings", "Repo-settings checks", "warn", "Could not complete the repo-settings checks. The job log has the reason.",
+      `Could not complete: ${untrustedText(error.message)}`);
   }
 }
 
@@ -293,16 +323,21 @@ if (declaredTier >= 3) checkTier3();
 const relevant = results.filter((r) => r.tier <= declaredTier);
 const icon = { pass: "✅", fail: "❌", warn: "⚠️", skip: "➖" };
 
-const lines = [`# Playbook tier verification (declared: Tier ${declaredTier})`, ""];
-lines.push("| Status | Check | Detail |", "|---|---|---|");
-for (const r of relevant) {
-  lines.push(`| ${icon[r.status]} ${r.status} | ${escapeTableCell(r.label)} | ${escapeTableCell(r.detail)} |`);
+function renderTable(field) {
+  const lines = [`# Playbook tier verification (declared: Tier ${declaredTier})`, ""];
+  lines.push("| Status | Check | Detail |", "|---|---|---|");
+  for (const r of relevant) {
+    lines.push(`| ${icon[r.status]} ${r.status} | ${escapeTableCell(r.label)} | ${escapeTableCell(r[field])} |`);
+  }
+  return lines.join("\n");
 }
-const summary = lines.join("\n");
-console.log(summary);
+
+// The job log gets the full detail. The step-summary file gets only text this script wrote
+// itself, so nothing that came from the network is ever written to a file.
+console.log(renderTable("logDetail"));
 if (process.env.GITHUB_STEP_SUMMARY) {
   const fs = await import("node:fs");
-  fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary + "\n");
+  fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, renderTable("detail") + "\n");
 }
 
 const failures = relevant.filter((r) => r.status === "fail");

@@ -8,6 +8,7 @@ import {
   findFloatingActionRefs,
   isNewer,
   isReusableOnly,
+  parseRepoSlug,
   parseVersion,
   readDocsImpactDeclaration,
   readPinnedRelease,
@@ -282,4 +283,12 @@ test("readPlaybookCheckoutRef is scoped to the playbook checkout step and ignore
   // A ref in an earlier step is not the playbook checkout's either.
   const earlier = [`      - uses: a/b@${sha}`, "        with:", "          ref: v9.9.9", `      - uses: actions/checkout@${sha}`, "        with:", "          repository: solarssk/playbook"].join("\n");
   assert.equal(readPlaybookCheckoutRef(earlier), null);
+});
+
+test("parseRepoSlug accepts owner/repository and nothing that could change a request path", () => {
+  assert.deepEqual(parseRepoSlug("solarssk/playbook"), { owner: "solarssk", repo: "playbook" });
+  assert.deepEqual(parseRepoSlug("a.b-c_d/e.f"), { owner: "a.b-c_d", repo: "e.f" });
+  for (const bad of ["", "owner", "o/r/extra", "../x", "o/..", "./r", "o/", "/r", "o r/x", "o/r?x=1", "o/r#f", "o/%2e%2e", undefined, null]) {
+    assert.equal(parseRepoSlug(bad), null, `should reject ${JSON.stringify(bad)}`);
+  }
 });
