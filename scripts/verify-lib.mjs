@@ -245,3 +245,11 @@ export function readPlaybookCheckoutRef(workflowText) {
   const ref = checkout?.find((line) => line.startsWith("ref:"));
   return ref === undefined ? null : unquote(ref.slice("ref:".length).trim());
 }
+
+// `owner/repo` split into two plain names, or null. Each part is limited to the characters GitHub
+// allows and may not be "." or "..", so it cannot change the meaning of a request path.
+export function parseRepoSlug(value) {
+  const parts = String(value ?? "").split("/");
+  const plain = (part) => part.length > 0 && part.length <= 100 && part !== "." && part !== ".." && /^[A-Za-z0-9_.-]+$/.test(part);
+  return parts.length === 2 && parts.every(plain) ? { owner: parts[0], repo: parts[1] } : null;
+}
