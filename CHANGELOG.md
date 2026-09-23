@@ -80,7 +80,9 @@ warns until one is linked; it cannot check the level.
 - The playbook now holds itself to its own standard at Tier 2, enforced by a `self-verify` CI job,
   with unit and end-to-end tests of its scripts, coverage in Codecov and SonarCloud,
   `actionlint`, `zizmor`, CodeQL, dependency review, OSV-Scanner, a Scorecard workflow,
-  `CONTRIBUTING.md`, and a pull request template.
+  `CONTRIBUTING.md`, and a pull request template. Its two Python scripts (`validate_yaml.py`,
+  `check_doc_snippets.py`) now carry their own pytest suite at 100% line coverage, feeding the same
+  Codecov and SonarCloud pipeline as the JavaScript tests.
 
 ### Changed
 
