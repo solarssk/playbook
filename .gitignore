@@ -4,3 +4,7 @@
 # Written by the test job for Codecov and SonarCloud.
 coverage/
 junit.xml
+junit-python.xml
+.pytest_cache/
+.coverage
+__pycache__/
