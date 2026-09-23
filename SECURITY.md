@@ -4,7 +4,7 @@
 
 Please do NOT open a public issue for security vulnerabilities.
 
-Report privately via [GitHub Security Advisories](../../security/advisories/new)
+Report privately via [GitHub Security Advisories](https://github.com/solarssk/playbook/security/advisories/new)
 or by contacting @solarssk directly.
 
 We aim to acknowledge reports within 48 hours.
