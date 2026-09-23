@@ -20,6 +20,7 @@ project would need, because it has one audience and one entry point.
 [![CI](https://github.com/solarssk/playbook/actions/workflows/ci.yml/badge.svg)](https://github.com/solarssk/playbook/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/github/license/solarssk/playbook)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/solarssk/playbook)](https://github.com/solarssk/playbook/releases/latest)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/solarssk/playbook/badge)](https://securityscorecards.dev/viewer/?uri=github.com/solarssk/playbook)
 
 ## Table of contents
 

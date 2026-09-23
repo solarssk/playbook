@@ -113,6 +113,10 @@ warns until one is linked; it cannot check the level.
 - `verify-tier` read `uses:` lines inside YAML comments as real steps, read a `Tier: N` line quoted
   in a fenced code block as the repository's own declaration, and expected a `concurrency:` block on
   a reusable-only workflow. Fenced blocks are read as CommonMark defines them.
+- This repository did not follow its own Tier 2 badge rule: the Scorecard workflow had published a
+  result, but no badge linked it from the README (`docs/openssf.md`, `docs/readme-standard.md`).
+  Added. `SECURITY.md`'s reporting link was relative, which several tools that read a security
+  policy in isolation treat as no link at all; changed to an absolute URL.
 
 ## [0.1.2] - 2026-09-08
 
