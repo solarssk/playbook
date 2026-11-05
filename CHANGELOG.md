@@ -10,77 +10,42 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 
 ### Adopter action
 
-- **All tiers:** use `auto` or one literal digit from `0` to `3` for the verifier tier.
-  Fix malformed `Tier:` declarations. Pin reusable-workflow calls to full commit SHAs.
-  Read warnings, skips, and manual requirements before claiming compliance.
-- **All tiers, if calling `verify-tier`:** bump the pinned SHA to the commit behind `v0.3.0`
-  to get exact source identity. The `v0.2.0` workflow checks out the verifier by tag and
-  does not provide this guarantee. GitHub Enterprise Server is unsupported. Keep any
-  administrative read token on trusted settings-check paths, not PR paths.
-- **All tiers, if deviating from a requirement:** record the requirement, tier, reason,
-  accountable role, approval, review date, and remediation. A recorded gap is not a pass.
-- **All tiers, if using `codecov/test-results-action`:** replace it with a full-SHA-pinned
-  `codecov/codecov-action` and set `report_type: test_results`. Keep the token and JUnit report
-  paths configured. See the Codecov recipe in `docs/ci-cookbook.md` section 9.
-- **Tier 2 and above:** confirm that every applicable PR gate is actually required,
-  directly or through a tested fail-closed aggregate. Do not require scheduled-only or
-  report-only checks on every PR. Adding a workflow does not update GitHub settings.
-- **Tier 3:** verify both the coverage and code-quality gates, including their thresholds
-  and merge enforcement. A text match for either tool is not sufficient.
+- **All tiers:** use `auto` or one literal digit from `0` to `3` for the verifier tier. Fix malformed `Tier:` declarations. Pin reusable-workflow calls to full commit SHAs. Read warnings, skips, and manual requirements before claiming compliance.
+- **All tiers, if calling `verify-tier`:** bump the pinned SHA to the commit behind `v0.3.0` to get exact source identity. The `v0.2.0` workflow checks out the verifier by tag and does not provide this guarantee. GitHub Enterprise Server is unsupported. Keep any administrative read token on trusted settings-check paths, not PR paths.
+- **All tiers, if deviating from a requirement:** record the requirement, tier, reason, accountable role, approval, review date, and remediation. A recorded gap is not a pass.
+- **All tiers, if using `codecov/test-results-action`:** replace it with a full-SHA-pinned `codecov/codecov-action` and set `report_type: test_results`. Keep the token and JUnit report paths configured. See the Codecov recipe in `docs/ci-cookbook.md` section 9.
+- **Tier 2 and above:** confirm that every applicable PR gate is actually required, directly or through a tested fail-closed aggregate. Do not require scheduled-only or report-only checks on every PR. Adding a workflow does not update GitHub settings.
+- **Tier 3:** verify both the coverage and code-quality gates, including their thresholds and merge enforcement. A text match for either tool is not sufficient.
 
 ### Added
 
-- Workflow outputs `automated_checks=passed|failed` and `assessment=partial|failed`, plus
-  stable check IDs in the human-readable report. The verifier never certifies full compliance.
-- Effective branch Rulesets support alongside classic protection, including pagination,
-  branch-path encoding, schema validation, and explicit partial-data warnings.
-- A compatibility policy for the standard, automation interfaces, templates, and releases,
-  with a manual deviation record rather than an automated exception engine.
-- A fail-closed `Required CI` aggregate, dependency-coverage regression test, JavaScript
-  and Python static checks, and npm/pip Dependabot coverage for development tools.
+- Workflow outputs `automated_checks=passed|failed` and `assessment=partial|failed`, plus stable check IDs in the human-readable report. The verifier never certifies full compliance.
+- Effective branch Rulesets support alongside classic protection, including pagination, branch-path encoding, schema validation, and explicit partial-data warnings.
+- A compatibility policy for the standard, automation interfaces, templates, and releases, with a manual deviation record rather than an automated exception engine.
+- A fail-closed `Required CI` aggregate, dependency-coverage regression test, JavaScript and Python static checks, and npm/pip Dependabot coverage for development tools.
 
 ### Changed
 
-- Heuristic scanner, workflow, badge-level, and gate checks stay warnings even when text
-  matches. Tier 3 coverage and quality gates are assessed together, not as alternatives.
-- The reusable workflow validates its source repository and SHA before checking out
-  `job.workflow_sha`. Release metadata is no longer an executable checkout reference.
+- Heuristic scanner, workflow, badge-level, and gate checks stay warnings even when text matches. Tier 3 coverage and quality gates are assessed together, not as alternatives.
+- The reusable workflow validates its source repository and SHA before checking out `job.workflow_sha`. Release metadata is no longer an executable checkout reference.
 - Token guidance covers GitHub App installation tokens as well as fine-grained PATs.
-- Branch-protection guidance distinguishes applicable merge gates from reports and
-  documents the separate live-settings rollout.
-- The playbook's workflows and development setup use Node.js 26, matching its Node.js types.
-  Dependabot groups version updates and limits them to one open PR per ecosystem; security
-  updates remain separate.
-- The Codecov recipe and this repository's CI use `codecov/codecov-action` for test results as
-  well as coverage. Codecov deprecated the separate test-results action.
+- Branch-protection guidance distinguishes applicable merge gates from reports and documents the separate live-settings rollout.
+- The playbook's workflows and development setup use Node.js 26, matching its Node.js types. Dependabot groups version updates and limits them to one open PR per ecosystem; security updates remain separate.
+- The Codecov recipe and this repository's CI use `codecov/codecov-action` for test results as well as coverage. Codecov deprecated the separate test-results action.
 
 ### Fixed
 
-- `verify-tier` rejects invalid tier inputs and malformed or out-of-range declarations instead
-  of silently selecting the wrong tier or passing without running any checks.
-- Empty required-check lists no longer establish protection, and unreadable classic or
-  Rulesets data cannot silently produce a complete pass.
+- `verify-tier` rejects invalid tier inputs and malformed or out-of-range declarations instead of silently selecting the wrong tier or passing without running any checks.
+- Empty required-check lists no longer establish protection, and unreadable classic or Rulesets data cannot silently produce a complete pass.
 - API requests retain a fixed GitHub origin and reject redirects.
-- Adoption and release instructions distinguish the source-identity fix from the published
-  `v0.2.0` behavior and keep administrative tokens out of the PR workflow example.
+- Adoption and release instructions distinguish the source-identity fix from the published `v0.2.0` behavior and keep administrative tokens out of the PR workflow example.
 - The Scorecard recipe now matches this repository's verified v2.5.0 action pin.
-- This repository's dependency review checks newly introduced high and critical vulnerabilities
-  in runtime, development, and unknown dependency scopes instead of only runtime.
-- The release guard rejects noncanonical stable tags and requires the pushed tag to match
-  `PLAYBOOK_RELEASE` exactly instead of accepting differently spelled version numbers.
+- This repository's dependency review checks newly introduced high and critical vulnerabilities in runtime, development, and unknown dependency scopes instead of only runtime.
+- The release guard rejects noncanonical stable tags and requires the pushed tag to match `PLAYBOOK_RELEASE` exactly instead of accepting differently spelled version numbers.
 
-The aggregate gate has passed real PR runs, and `Required CI` is now required in this
-repository's branch protection. A temporary PR with a failing test confirmed that the gate
-fails and GitHub marks the PR as blocked. The protection also applies to administrators.
-CodeQL, dependency review, OSV, and the documentation-impact check have their own required
-contexts. Immutable releases were enabled for future publications. This does not retroactively
-protect `v0.2.0`.
+The aggregate gate has passed real PR runs, and `Required CI` is now required in this repository's branch protection. A temporary PR with a failing test confirmed that the gate fails and GitHub marks the PR as blocked. The protection also applies to administrators. CodeQL, dependency review, OSV, and the documentation-impact check have their own required contexts. Immutable releases were enabled for future publications. This does not retroactively protect `v0.2.0`.
 
-Cross-repository trials verified that the verifier source is checked out at the called
-workflow's exact SHA and runs on Node.js 26. A declared Tier 2 repository returned
-`passed` / `partial`. A repository without a tier declaration failed on missing files
-with an explicit Tier 1 input and returned `failed` / `failed`; `auto` failed before
-producing outputs. No administrative token was supplied, so settings checks were skipped.
+Cross-repository trials verified that the verifier source is checked out at the called workflow's exact SHA and runs on Node.js 26. A declared Tier 2 repository returned `passed` / `partial`. A repository without a tier declaration failed on missing files with an explicit Tier 1 input and returned `failed` / `failed`; `auto` failed before producing outputs. No administrative token was supplied, so settings checks were skipped.
 
 ## [0.2.0] - 2026-09-19
 
