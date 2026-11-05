@@ -1,16 +1,10 @@
-# CI Cookbook
+# CI cookbook
 
-A practical, copy-paste reference for wiring up CI/CD security and quality tooling on a repository.
-This is not a "turn everything on" checklist: a small single-purpose tool and a flagship product
-with real users carry different risk, different maintenance budgets, and shouldn't carry the same
-CI weight. Every recipe below states which tier(s) it applies to; skipping a tool for a Tier 1 repo
-is a legitimate decision, not a shortcut someone forgot to take.
-
-Every snippet here is a working pattern verified against real CI configuration, not invented from
-documentation memory. Action names and commit SHAs should be treated as verified starting points,
-current as of the time this doc was written; keep them fresh with Dependabot (§1) rather than
-hand-copying them indefinitely. Placeholders like `<owner>/<repo>` or `<org>` stand in for values
-specific to the repo you're configuring.
+Copy-ready recipes for CI security and quality tooling. Apply the recipes for your
+[tier checklist](tiers.md#at-a-glance), not every tool on the page.
+Patterns were verified against real CI configuration; action names and SHAs are starting points,
+not permanent pins. Keep them current with Dependabot (§4). Replace `<owner>/<repo>` and `<org>`
+with the target repository's values.
 
 ## Tiers
 
@@ -20,8 +14,9 @@ specific to the repo you're configuring.
 | **Tier 2** | Public tool with real users or dependents. Ships an artifact (package, container image, plugin) that strangers install and rely on; has an issue tracker other people actually file into. | A published container image on a registry, a public npm/pip package, a plugin distributed to other projects. |
 | **Tier 3** | Flagship / keystone project. Self-hosted product handling sensitive data (auth, personal data, anything payments-adjacent), multi-service architecture: the repo that would cause the most damage if it shipped a vulnerability. | The primary product whose failure would do the most damage. |
 
-Treat this as a spectrum, not a rigid checklist. A mostly-dormant Tier 2 repo doesn't need every
-Tier 3 recipe; a Tier 1 repo that suddenly gets real users should move up.
+Reassess tiers as usage changes. A dormant Tier 2 repo does not need Tier 3 machinery;
+a Tier 1 repo gaining dependents should move up. Use [the tier-selection questions](tiers.md#how-to-pick-a-tier)
+for the decision.
 
 ## Contents
 
@@ -45,15 +40,11 @@ Tier 3 recipe; a Tier 1 repo that suddenly gets real users should move up.
 
 ## 1. Pin GitHub Actions to a commit SHA
 
-**Why:** `uses: owner/action@v4` is a mutable pointer, not a version. The action's maintainer, or
-anyone who compromises their account or the marketplace listing, can repoint that tag at different
-code at any time, and every workflow using it starts running the new code on its next trigger, with
-no diff and no review in your repo. A commit SHA is immutable: `uses: owner/action@<40-char-sha>`
-guarantees the exact code that ran in your last CI run is the code that runs again tomorrow, until
-you deliberately bump it.
+**Why:** a mutable tag such as `uses: owner/action@v4` can change through a maintainer's action
+or account/marketplace compromise, without a diff or review in your repository.
+A full commit SHA fixes the action source until you deliberately update the pin.
 
-**When to use it:** All tiers, no exceptions. This is the cheapest, highest-leverage supply-chain
-control available, and Dependabot removes essentially all of its maintenance cost.
+**When to use it:** all tiers, no exceptions. Use Dependabot to maintain the pins.
 
 **Pattern:**
 
@@ -64,14 +55,9 @@ steps:
       persist-credentials: false
 ```
 
-The trailing `# vX.Y.Z` comment is for humans only (GitHub Actions ignores it), but keep it,
-because Dependabot writes and maintains it automatically and it's the only way to eyeball what
-version a pin corresponds to. This depends on the comment already being an exact version: a bare
-major alias like `# v6` is not something Dependabot rewrites in place. A real Dependabot commit
-bumping a pin from v6.2.0 to v7.0.0 has been observed leaving a pre-existing `# v6` comment
-untouched, which now names the wrong major version rather than merely a stale one. Always write
-the exact pinned version in the comment, never a bare major, so Dependabot's own bump PRs keep it
-accurate.
+Keep an exact trailing `# vX.Y.Z` comment so readers can identify the pinned version.
+GitHub Actions ignores it; Dependabot maintains it only when it already names an exact version.
+Bare aliases such as `# v6` can remain unchanged across major upgrades and become misleading.
 
 **Finding and updating pins:**
 
@@ -110,17 +96,18 @@ accurate.
 
 ## 2. Concurrency groups (cancel on supersede vs never cancel a release)
 
-**Why:** without a `concurrency:` block, every push or retriggered event starts a fully independent
-workflow run; runs pile up, finish out of order, and burn minutes. `concurrency:` tells GitHub "at
-most one run in this group may be active: queue or cancel the rest." There are two shapes, and
-they are **not interchangeable**.
+**Why:** `concurrency:` limits simultaneous runs in a group, reducing duplicate work and out-of-order results.
+CI cancellation and release serialization are **not interchangeable**:
+
+| Workflow | Policy |
+|---|---|
+| CI / PR checks | Cancel superseded runs outside the trunk branch |
+| Release / publish | Never cancel an in-progress publish; choose the group carefully to avoid dropping pending releases |
 
 ### a) CI / PR pattern: cancel superseded runs
 
-**When to use it:** every workflow triggered by `push`/`pull_request` (CI, CodeQL, Semgrep), all
-tiers. A new push to a PR makes the previous run's result irrelevant, so there's no reason to let it
-keep burning minutes. `cancel-in-progress` is gated on not being the trunk branch, so a push to
-`main` is never raced against a redundant duplicate run of the same commit.
+**When to use it:** every non-release `push`/`pull_request` workflow, all tiers, including CI,
+CodeQL, and Semgrep. Cancel obsolete PR runs, but not trunk runs: the condition below excludes `main`.
 
 ```yaml
 concurrency:
@@ -133,12 +120,10 @@ concurrency:
 
 ### b) Release / publish pattern: never cancel mid-flight
 
-**When to use it:** any workflow that publishes something with irreversible side effects: a
-container image push, an SBOM upload, a GitHub Release creation. Tier 2+ (Tier 1 tools that publish
-nothing usually have nothing to gate here). Cancelling a release workflow partway through does not
-roll any of that back. It leaves a half-published state (an image tag that exists but was never
-scanned, a release with no assets) with no automatic recovery. The only safe default is
-`cancel-in-progress: false`, always.
+**When to use it:** any workflow with irreversible publishing effects, such as an image push,
+SBOM upload, or GitHub Release creation, usually Tier 2+.
+Cancellation cannot roll back a partial publication and provides no automatic recovery.
+Always set `cancel-in-progress: false`.
 
 ```yaml
 concurrency:
@@ -158,33 +143,25 @@ concurrency:
   cancel-in-progress: false
 ```
 
-**This bug class is common enough to name explicitly, and it shows up in two distinct ways.** The
-first: the (a) pattern gets copy-pasted into a release/publish workflow, keeping
-`cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`. A tag push's `github.ref` is
-`refs/tags/vX.Y.Z`, never `refs/heads/main`, so that expression evaluates to `true` on *every* tag
-push. A second matching run (a retry, a follow-up tag) can then cancel a publish that already had a
-container pushed, an SBOM uploaded, or a GitHub Release half-created, with no rollback. The second:
-a publish workflow with a side-effecting multi-arch build-and-release step ships with **no**
-concurrency group at all, copied from a template that assumed CI's own protections already applied.
-Treat "does this workflow publish anything" as the fork in the road for which pattern to use. Never
-assume the CI pattern is safe by default.
+Avoid both publish-workflow failure modes:
+
+- Copying pattern (a): `refs/tags/vX.Y.Z` is not `refs/heads/main`, so its cancellation condition
+  is true on every tag push. A matching retry or follow-up can cancel a partially completed publish.
+- Omitting concurrency: a side-effecting build-and-release step, including a multi-architecture
+  build, does not inherit protection from the CI workflow.
+
+Choose the pattern by whether the workflow publishes anything, not by the template it came from.
 
 ---
 
 ## 3. Dependency vulnerability audit (pip-audit, npm audit, osv-scanner)
 
-**Why:** Dependabot's security-updates alert (Tier 0) is passive: it opens a PR against a known
-vulnerability that's already in the dependency graph, on its own schedule, and does nothing to
-stop a PR from *introducing* a fresh vulnerable pin in the first place. A CI audit step closes
-that gap: it runs against the exact manifest a PR proposes, before merge, and fails the build the
-moment a known-CVE dependency is added or reintroduced. It's also the single cheapest, most
-legible control in this cookbook: no external account, no token, seconds of runtime against an
-already-pinned dependency set (Tier 1 already requires pinned dependencies, so there's no
-floating-version noise to fight), and it's the one check here a stranger can reproduce
-unassisted against bare source with one command.
+**Why:** Dependabot security updates react to vulnerabilities already in the dependency graph;
+they do not block a PR introducing a vulnerable pin. Audit the proposed manifest in CI before
+merge to catch new or reintroduced known vulnerabilities. These checks need no external account
+or token and can be reproduced against source.
 
-**When to use it:** Tier 1 and up, no exceptions. This is cheap enough, and closes a common
-enough gap, that "the repo is small" isn't a reason to skip it.
+**When to use it:** Tier 1 and up, no exceptions. Repository size is not a reason to skip it.
 
 **Pattern (Python, pip-audit):**
 
@@ -1150,14 +1127,11 @@ custody of an admin-scoped secret are worth it.
 
 ## 13. Verifying a repo against this standard automatically
 
-Everything above is a recipe you copy into your own repo. This playbook also publishes a reusable
-workflow that runs the file- and pattern-based half of [docs/tiers.md](tiers.md)'s checklist for
-you, from one place, so a change to what the standard requires doesn't mean re-copying anything.
+Call the reusable workflow to run the automated subset of [the tier checklist](tiers.md#at-a-glance)
+without maintaining your own copy of the verifier. It checks files and patterns, not full compliance.
 
-**When to use it:** any tier, once a repo has adopted the standard (carries the pointer block from
-[AGENTS.md](../AGENTS.md), "If you were sent here from another repository"). Add it as a required
-status check once you trust its output; report-only first if you're not sure yet what it will say
-about a repo that's never been checked before.
+**When to use it:** any tier, after adoption and adding the [repository-standard pointer](../AGENTS.md#if-you-were-sent-here-from-another-repository).
+Use report-only first if unsure what an unassessed repository will report; require the check once you trust its output.
 
 The behavior below describes the workflow in this checkout. Before copying the example, select a
 published release that includes these changes and review its release notes. Older releases do not
@@ -1180,15 +1154,11 @@ jobs:
     uses: solarssk/playbook/.github/workflows/verify-tier.yml@<commit-sha>  # <release-version>
 ```
 
-Pin the reusable workflow call to a commit SHA, not a tag, the same rule as every other `uses:`
-reference in this document (§1): a floating tag or `@main` here means playbook can silently change
-what "passing" means in every repo that calls it, with no diff for any of them to review. A SHA
-means you see and choose the bump, and Dependabot's `github-actions` ecosystem (§4) proposes it the
-same way it proposes any other Action version bump, comment included, so the tag stays visible next
-to the SHA. Find the SHA for a given release with `git ls-remote --tags
-https://github.com/solarssk/playbook`. For an annotated tag, use the peeled commit SHA shown on
-the `refs/tags/<version>^{}` line, not the tag-object SHA. A lightweight tag has only the
-`refs/tags/<version>` line.
+Pin the call to a full commit SHA with an exact version comment (§1), never a floating tag or `@main`.
+That keeps changes reviewable; Dependabot's `github-actions` ecosystem (§4) proposes pin and comment updates.
+Find release SHAs with `git ls-remote --tags https://github.com/solarssk/playbook`.
+For annotated tags, use the peeled commit SHA on `refs/tags/<version>^{}`, not the tag-object SHA.
+A lightweight tag has only the `refs/tags/<version>` line.
 
 In this checkout, the called workflow checks out the same commit that defines its job, using
 the validated `job.workflow_sha` and `job.workflow_repository` fields. `PLAYBOOK_RELEASE` is
@@ -1201,55 +1171,48 @@ releases. Pinning the workflow call to a SHA does not guarantee that its verifie
 at that same SHA. To obtain that guarantee, upgrade to a published release containing the
 source-identity fix.
 
-The `permissions:` block on the calling workflow is not optional either. Without it, this workflow
-runs with the repository's default `GITHUB_TOKEN` permissions, which on most repositories is
-broader read/write access than a job that only checks out code and runs a script needs. Set it
-explicitly even though the called workflow also declares its own `permissions: contents: read`;
-each workflow file needs its own block; a caller does not inherit or narrow the callee's.
+Set `permissions: contents: read` explicitly in the caller, even though the callee also declares it.
+Each file needs its own block; without one, the caller uses repository-default token permissions,
+which can be broader than necessary.
 
-**What it checks without any extra setup:** LICENSE, CODEOWNERS, SECURITY.md, CONTRIBUTING.md,
-issue and PR templates, SHA-pinning, `permissions:` and `concurrency:` blocks, and a handful of
-keyword-based heuristics (a secret-scan step, a dependency-audit step, SAST, an OpenSSF Scorecard
-workflow, a badge row). It also reports whether a newer playbook release exists than the one the
-call is pinned to (see below). Unless the `tier` input overrides it, the tier is read from the
-first `Tier: N` declaration outside fenced code blocks in the calling repo's `AGENTS.md`, or
-`CLAUDE.md` if `AGENTS.md` does not exist. `N` must be a single digit from `0` to `3`; explanatory
-text may follow after whitespace. The input accepts `auto` or one of `0`, `1`, `2`, and `3`.
-Invalid inputs or declarations fail before any checks run.
+Verification has three sources of evidence:
 
-**What needs `admin_token`, an optional GitHub App installation token or fine-grained PAT
-with repository Administration: read:**
-delete-branch-on-merge, Dependabot security-updates status, whether branch protection exists
-at all, and whether every required status check matches the name a workflow job actually reports.
-Classic protection and active applicable Rulesets are combined. Empty required-check lists
-do not establish protection; an unreadable source leaves the assessment incomplete.
-These checks are reported as skipped, not silently omitted, if the secret isn't provided. This
-is the same limitation described in §12: `administration` isn't a scope a workflow's own
-`permissions:` block can grant, so there is no way to read these without a token that already has
-that access. Inject a short-lived installation token or a separately stored PAT only in a
-separate scheduled or manually dispatched settings-check workflow that runs trusted code and
-inputs. Add `secrets: {admin_token: ...}` to that trusted caller, never to a
-pull-request-triggered workflow.
+| Source | Coverage |
+|---|---|
+| Files and configuration | LICENSE, CODEOWNERS, SECURITY.md, CONTRIBUTING.md, issue/PR templates, SHA pins, permissions, and concurrency |
+| Keyword heuristics | Secret scanning, dependency audits, SAST, Scorecard, and README badges; matches remain warnings |
+| Optional `admin_token` | Delete-branch-on-merge, Dependabot security updates, branch protection, and required-context names |
 
-**How a repo finds out the playbook changed.** Pinning to a SHA means nothing updates silently, so
-the notification has to be deliberate. Two mechanisms carry it, and both depend on the playbook
-publishing a real GitHub Release for every version, not just a tag:
+Tier selection is strict. An explicit numeric `tier` input overrides the automatic declaration:
 
-1. **A warning in the check itself.** On every run, `verify-tier` compares its `PLAYBOOK_RELEASE`
-   notification baseline against the playbook's latest Release. If a newer one exists, the run reports a
-   `playbook-version` warning and a workflow annotation with a link to the release notes. It
-   never fails the build: a new release must not turn every adopter's CI red at once. It is a
-   prompt to read the notes and bump the pin.
-2. **A Dependabot pull request.** If the adopting repo has the `github-actions` ecosystem in its
-   `dependabot.yml` (§4), Dependabot proposes the SHA bump on its own. It normally includes the
-   Release notes in the PR description, but confirm that on the first real bump rather than
-   relying on it; the warning in mechanism 1 does not depend on Dependabot.
+| Setting | Contract |
+|---|---|
+| `tier` input | `auto` or one literal digit: `0`, `1`, `2`, `3` |
+| Automatic declaration | First `Tier: N` outside fenced code in `AGENTS.md`; use `CLAUDE.md` only if `AGENTS.md` does not exist |
+| Declaration format | One digit from `0` to `3`; explanatory text may follow after whitespace |
+| Invalid input or declaration | Fails before checks run |
 
-Either way, the thing to read is the release's **Adopter action** list: what a repository at each
-tier must change to stay in line. A release with no such list changes nothing an adopter has to do.
+For live settings, `admin_token` must be a GitHub App installation token or fine-grained PAT with
+repository Administration: read. The default `GITHUB_TOKEN` cannot gain that scope through
+`permissions:` (§12). Without the secret, settings checks explicitly report skipped.
+Classic protection and active applicable Rulesets are combined; empty required-check lists do
+not establish protection, and an unreadable source leaves the assessment incomplete.
 
-Keep the `github-actions` Dependabot entry in any repo that calls this workflow. Without it, the
-warning in the workflow run is the only signal, and a warning nobody is looking at gets missed.
+**Keep administrative tokens out of PR-triggered workflows.** Inject a short-lived installation
+token or separately stored PAT only in a separate scheduled or manually dispatched settings-check
+workflow with trusted code and inputs. Add `secrets: {admin_token: ...}` only to that trusted caller.
+
+Update notifications require a GitHub Release per version, not merely a tag:
+
+| Signal | Behavior |
+|---|---|
+| `playbook-version` warning | Each run compares `PLAYBOOK_RELEASE` with the latest Release; a newer version produces a warning and annotation linking to release notes, never a build failure |
+| Dependabot PR | The `github-actions` ecosystem proposes the SHA bump; confirm release-note inclusion on the first real bump |
+
+Keep the `github-actions` Dependabot entry in every caller. Without it, the workflow warning is
+the only notification; that warning works independently of Dependabot.
+Read the release's **Adopter action** list for changes by tier, then review and bump the pin.
+A release without that list requires no adopter action.
 
 The workflow outputs `automated_checks=passed|failed` and `assessment=partial|failed`.
 Exit 0 means no hard check failed, not full tier compliance. Heuristics remain warnings even

@@ -1,32 +1,14 @@
-# README Standard
+# README standard
 
-This document defines how `README.md` should be written for any repository owned
-by this organization. It is tiered, not one-size-fits-all: a two-file config
-repo and a multi-service product do not need the same README, and forcing them
-to converge on the same template produces either a bloated README on the small
-repo or a thin, unhelpful one on the large repo. Pick a tier, follow its
-required section list, and treat everything above that tier as optional.
+Write a README that explains what the project does, gets readers started, and links to deeper docs.
+Pick the repository's [tier](tiers.md#how-to-pick-a-tier), follow its required sections, and
+treat sections above that tier as optional. Use [`templates/README.template.md`](../templates/README.template.md)
+as the starting point; this guide explains the section choices.
 
-This standard is informed by three things:
-
-1. The [**Standard Readme** specification](https://github.com/RichardLitt/standard-readme),
-   an established open convention for section order and formatting. This
-   document follows its ordering logic where it applies, and departs from it
-   explicitly where a tiered, multi-repo organization has different needs
-   (see [Deviations from Standard Readme](#deviations-from-standard-readme)).
-2. The [**AGENTS.md** convention](https://agents.md), an open spec for giving
-   AI coding agents build/test/style/architecture context in a dedicated file
-   separate from the human-facing README.
-3. Patterns observed to actually work, and to actually fail, across a
-   cross-repo audit of real, in-production repositories of varying size and
-   audience. Where this document recommends against something (a missing
-   table of contents, a routing table on a single-audience tool, deep
-   algorithmic narrative inlined into a README), that recommendation traces
-   back to a concrete, observed case, not a hypothetical.
-
-Use the companion file, [`templates/README.template.md`](../templates/README.template.md),
-as the literal starting point for a new or rewritten README. This document
-explains the *why*; the template is the *what to paste*.
+The standard combines [Standard Readme](https://github.com/RichardLitt/standard-readme) section
+ordering, the [AGENTS.md convention](https://agents.md) for agent-facing context, and lessons from
+auditing production repositories. See [the deliberate deviations](#deviations-from-standard-readme)
+for differences from Standard Readme.
 
 ## Table of contents
 
@@ -46,13 +28,8 @@ explains the *why*; the template is the *what to paste*.
 **Open with one paragraph that explains what the project is and why it
 exists, before a single line of setup instruction.**
 
-This is the single most valuable habit in this entire standard, and it is
-the one thing every genuinely good README shares regardless of tier or
-length. A reader, human or AI agent, who has never seen the repo before
-needs to answer two questions before anything else is useful to them: *what
-does this do*, and *why would I want it instead of the obvious alternative*.
-A wall of badges, a table of contents, or a `docker compose up` command
-answers neither.
+Readers need to understand the project and its value before setup commands are useful.
+Badges, a table of contents, and a `docker compose up` command cannot replace that explanation.
 
 Concretely:
 
@@ -72,10 +49,8 @@ Concretely:
 
 ## Tiers
 
-Pick a tier based on the repository's actual shape, not its ambition. A tier
-is a floor, not a target. Do not add Tier 3 sections to a Tier 1 repo
-"for consistency." An oversized README is a maintenance liability: every
-extra table, badge, and cross-link is one more thing that goes stale.
+A tier is a floor, not a target. Do not add Tier 3 sections to a Tier 1 README for consistency:
+unused tables, badges, and cross-links add maintenance.
 
 | | Tier 1: small, single-purpose tools | Tier 2: public tools with real dependents | Tier 3: flagship |
 |---|---|---|---|
@@ -84,10 +59,8 @@ extra table, badge, and cross-link is one more thing that goes stale.
 | **Deployment surface** | None, or "copy this file" | Real: containers, environment variables, a reverse proxy, a database | Real, plus a distinct production deployment path from local development |
 | **Typical length** | Under ~60 lines | 60–250 lines | 150+ lines, but structured so no single audience has to read all of it |
 
-If in doubt between two tiers, pick the lower one and let the README grow
-into the next tier when a real section demands it (a second audience shows
-up, CI starts publishing artifacts worth badging, etc.). It is much cheaper
-to add a section later than to carry an unused one indefinitely.
+If unsure between two tiers, pick the lower one. Add sections when a new audience or artifact
+requires them, not in anticipation.
 
 ## Section order by tier
 
@@ -221,44 +194,23 @@ is pure ceremony.
 
 ## The "who are you" routing table
 
-A table near the top of the README that says "if you are role X, start
-here; if you are role Y, start there" is a powerful pattern for exactly one
-situation: **the project genuinely has more than one audience who need
-different entry points and would otherwise get lost in content meant for
-someone else.** A real example of "genuinely multi-audience": a self-hosted
-product with end users who never touch code, IT operators who deploy and
-run it, developers who build it, and a security/compliance reviewer who
-needs to evaluate it before it's adopted: four audiences, four different
-documents, none of which is a subset of another.
+Use a routing table only for **distinct audiences needing different entry points**.
+For example, end users, operators, developers, and security reviewers may each need a separate document.
 
-That is the bar. Below it, a routing table is needless ceremony:
+| Reader situation | README structure |
+|---|---|
+| Operator and developer are the same person | One linear README; no routing table |
+| Readers differ only by topic of interest | Documentation links, not audience routing |
+| Several rows send one audience back to the same README | Remove the redundant routing table |
+| Distinct audiences need separate documents | One row per audience, each linking to exactly one document |
 
-- If the operator and the developer are the same person (true for most
-  self-hosted single-service tools), there is nothing to route between:
-  one linear README serves them both.
-- If "routing" really just means "here are the docs," that's a plain
-  documentation list (Tier 2's "Documentation links" section), not an
-  audience table. The tell is whether the rows differ by *who the reader
-  is* or just by *what topic they want*: only the former justifies this
-  pattern.
-- A routing table that ends up with three of four rows pointing a
-  single-audience reader back into the same README is a sign the table
-  shouldn't exist.
-
-When it *is* justified, place it immediately after the description
-paragraph and before any setup content. A multi-audience reader should
-never have to scroll past a Quick Start meant for someone else to find
-their own starting point. Keep one row per audience, each pointing to
-exactly one document.
+Place a justified routing table immediately after the description, before setup content.
+Readers should not have to scroll past another audience's setup to find their entry point.
 
 ## Table of contents (in your README)
 
-Follow the Standard Readme threshold: **required once the README exceeds
-roughly 100 lines**, optional below that. A short, single-screen README
-doesn't need a navigation aid; a long one does, and skipping it is a real,
-observed failure mode: a README with two dozen section headers and no
-table of contents forces every reader to scroll-hunt for the one section
-they need.
+A table of contents is **required above roughly 100 lines**, optional below that,
+following the Standard Readme threshold.
 
 To keep it accurate:
 
@@ -280,10 +232,7 @@ To keep it accurate:
 
 ## Quick start / Install / Usage
 
-A stale quick start is worse than no quick start. It actively costs a new
-reader more time than figuring it out from source would have, because they
-trust it first and only discover it's wrong after it fails. Treat this
-section as a tested artifact, not documentation prose:
+Treat the quick start as a tested artifact. Readers should not have to debug stale commands:
 
 - Every command in this section must work against the repository's
   **current** state: current script names, current environment variable
@@ -311,42 +260,21 @@ section as a tested artifact, not documentation prose:
 
 ## README vs AGENTS.md vs docs/*
 
-Three documents, three audiences, and content should live in exactly one of
-them:
+Keep each kind of content in one canonical place:
 
 | | Audience | Contents |
 |---|---|---|
 | **`README.md`** | A human (or an agent) deciding *whether and how* to use or run the project | What it is, why it exists, how to get it running, where to go next |
 | **`AGENTS.md`** | An AI coding agent *working inside* the codebase | Build/test commands, code style and lint conventions, architectural context an agent needs to make correct changes, PR/commit conventions |
-| **`docs/*.md`** | A human going deep on one topic | Full architecture and design-decision writeups, complete threat models, deployment runbooks, troubleshooting guides, compatibility notes |
+| **`docs/*.md`** | A human or agent going deep on one topic | Full architecture and design-decision writeups, complete threat models, deployment runbooks, troubleshooting guides, compatibility notes |
 
-The failure mode this table exists to prevent is deep technical content
-migrating into the README because it was easiest to add it where the
-author was already writing. Two concrete tells that content is in the
-wrong place:
+Move library-selection narratives, algorithm explanations, and deployment compatibility logs to
+`docs/`, with a one-line summary and link from the README. Link to `AGENTS.md` for build, lint,
+and style instructions rather than duplicating them. Creating a missing `AGENTS.md` is outside
+this README standard's scope; its absence is not a reason to put those instructions in the README.
 
-- **A multi-paragraph narrative belongs in `docs/`, not the README.** A
-  walkthrough of *why* a particular library was evaluated and rejected, a
-  step-by-step explanation of an idempotency or retry algorithm, or a
-  detailed compatibility log from a real deployment are all valuable, as
-  a page in `docs/ARCHITECTURE.md` or similar, linked from the README with
-  one summary line. Inlined into the README itself, the same content
-  buries the "what is this and how do I start" information every reader
-  needs under material almost none of them do.
-- **Build commands, lint rules, and code-style conventions belong in
-  `AGENTS.md`, not the README.** If a repo has an `AGENTS.md`, the README
-  should link to it for that content rather than restating it. Restating
-  it creates two documents that can silently disagree the next time either
-  one is updated. If the repo does not yet have an `AGENTS.md` and an
-  agent will be working in it, creating one is out of scope for this
-  standard, but the principle still applies: keep that material out of the
-  README either way.
-
-A useful gut check when drafting or reviewing a README section: *if I
-deleted this section, would a reader lose their ability to decide whether
-to use the project and get it running?* If yes, it stays in the README. If
-the honest answer is "no, but it's interesting/important context," it
-belongs in a linked doc.
+Keep a section in the README if readers need it to decide whether to use the project or get it running.
+Link out when it supplies deeper context instead.
 
 ## Deviations from Standard Readme
 
