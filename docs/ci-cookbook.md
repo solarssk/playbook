@@ -340,6 +340,11 @@ to be a compromised release that gets pulled within days. `cooldown` makes Depen
 proposing it, and security updates ignore it, so a real fix is not delayed. `zizmor` reports an
 entry without one (`dependabot-cooldown`), which is why it is in every block above.
 
+**Shared lockfiles:** grouping version updates reduces overlapping PRs that edit the same files.
+Setting `open-pull-requests-limit: 1` also limits concurrent version-update PRs per ecosystem, but
+can delay unrelated version updates. Security updates have a separate limit and can still
+overlap with version updates. Grouping and limits reduce conflicts, not eliminate them.
+
 ---
 
 ## 5. CodeQL (minimal, correct, least privilege)
@@ -1052,7 +1057,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
-          node-version: "22"
+          node-version: "26"
       - name: Check documentation-impact declaration
         run: node scripts/check-pr-docs-impact.mjs
 ```
