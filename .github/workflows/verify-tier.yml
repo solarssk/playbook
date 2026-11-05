@@ -17,13 +17,15 @@ name: Verify tier
 # checks are skipped and reported as such, not silently omitted. See
 # docs/ci-cookbook.md #12 for the full reasoning.
 #
-# Usage, in the calling repository's own workflow:
+# Usage, in the calling repository's PR workflow:
 #
 #   jobs:
 #     verify-standard:
-#       uses: solarssk/playbook/.github/workflows/verify-tier.yml@<commit-sha>  # v0.1.1
-#       secrets:
-#         admin_token: ${{ secrets.PLAYBOOK_ADMIN_TOKEN }}  # optional
+#       uses: solarssk/playbook/.github/workflows/verify-tier.yml@<commit-sha>  # <release-version>
+#
+# Pass `admin_token` only in a separate, trusted scheduled or manually
+# dispatched settings-check workflow, never on a pull-request-triggered path.
+# See docs/ci-cookbook.md #13.
 #
 # Tier is auto-detected from the calling repo's own AGENTS.md ("Tier: N" line,
 # added by the pointer block documented in this repo's AGENTS.md) unless the

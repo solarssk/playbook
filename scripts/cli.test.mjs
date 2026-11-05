@@ -85,12 +85,22 @@ test("release-check passes when the pin, the checkout ref, and the CHANGELOG agr
   assert.match(result.out, /v1\.2\.3 is consistent/);
 });
 
-test("release-check writes the CHANGELOG section as the release notes", () => {
-  const dir = releaseFixture();
+test("release-check accepts exact stable tags with zero and multi-digit components", () => {
+  for (const tag of ["v0.0.0", "v10.20.300"]) {
+    const dir = releaseFixture({ pin: tag, changelog: `## [${tag.slice(1)}]\n\n- a change\n` });
+    const result = run("release-check.mjs", { cwd: dir, env: { RELEASE_TAG: tag } });
+    assert.equal(result.code, 0, tag);
+  }
+});
+
+test("release-check preserves adopter actions and excludes other versions from the release notes", () => {
+  const releaseNotes = "### Adopter action\n\n- **All tiers:** review the new workflow.\n\n### Changed\n\n- Source identity.";
+  const changelog = `## [Unreleased]\n\n- pending\n\n## [1.2.3] - 2026-01-01\n\n${releaseNotes}\n\n## [1.2.2]\n\n- older\n`;
+  const dir = releaseFixture({ changelog });
   const notes = join(dir, "notes.md");
   const result = run("release-check.mjs", { cwd: dir, env: { RELEASE_TAG: "v1.2.3", NOTES_OUT: notes } });
   assert.equal(result.code, 0);
-  assert.equal(readFileSync(notes, "utf8"), "- a change\n");
+  assert.equal(readFileSync(notes, "utf8"), `${releaseNotes}\n`);
 });
 
 test("release-check rejects a tag that differs from the pin", () => {
@@ -99,11 +109,13 @@ test("release-check rejects a tag that differs from the pin", () => {
   assert.match(result.err, /does not match PLAYBOOK_RELEASE/);
 });
 
-test("release-check rejects a tag that is not vX.Y.Z, without echoing it", () => {
-  const result = run("release-check.mjs", { cwd: releaseFixture(), env: { RELEASE_TAG: "v1.2.3\n::error::injected" } });
-  assert.equal(result.code, 1);
-  assert.match(result.err, /RELEASE_TAG is not a vX\.Y\.Z tag/);
-  assert.doesNotMatch(result.err, /injected/);
+test("release-check rejects noncanonical tags without echoing them", () => {
+  for (const tag of ["1.2.3", "v01.2.3", "v1.02.3", "v1.2.03", "v1.2.3-rc.1", "v1.2.3\n", "v1.2.3\n::error::injected"]) {
+    const result = run("release-check.mjs", { cwd: releaseFixture(), env: { RELEASE_TAG: tag } });
+    assert.equal(result.code, 1, tag);
+    assert.match(result.err, /RELEASE_TAG is not a vX\.Y\.Z tag/);
+    assert.doesNotMatch(result.err, /injected/);
+  }
 });
 
 test("release-check rejects tags, fixed commits and caller-context checkout refs", () => {
@@ -114,10 +126,12 @@ test("release-check rejects tags, fixed commits and caller-context checkout refs
   }
 });
 
-test("release-check rejects a missing or invalid pin", () => {
-  const result = run("release-check.mjs", { cwd: releaseFixture({ pin: "main" }) });
-  assert.equal(result.code, 1);
-  assert.match(result.err, /missing or not a vX\.Y\.Z tag/);
+test("release-check rejects a missing or noncanonical pin", () => {
+  for (const pin of ["", "main", "1.2.3", "v01.2.3", "v1.02.3", "v1.2.03"]) {
+    const result = run("release-check.mjs", { cwd: releaseFixture({ pin }) });
+    assert.equal(result.code, 1, pin);
+    assert.match(result.err, /missing or not a vX\.Y\.Z tag/);
+  }
 });
 
 test("release-check rejects a version with no CHANGELOG section", () => {

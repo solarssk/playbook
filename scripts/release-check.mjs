@@ -14,7 +14,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 
-import { extractChangelogSection, parseVersion, readPinnedRelease, readPlaybookCheckoutRef } from "./verify-lib.mjs";
+import { extractChangelogSection, readPinnedRelease, readPlaybookCheckoutRef } from "./verify-lib.mjs";
 
 /** @returns {never} */
 function fail(message) {
@@ -22,30 +22,33 @@ function fail(message) {
   process.exit(1);
 }
 
+/** @param {string} value */
+function isStableTag(value) {
+  const match = /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/.exec(value);
+  return match !== null && match[0] === value;
+}
+
 const workflow = readFileSync(".github/workflows/verify-tier.yml", "utf8");
 const pinned = readPinnedRelease(workflow);
-const pinnedParts = parseVersion(pinned);
-if (!pinnedParts) {
+if (!pinned || !isStableTag(pinned)) {
   fail("PLAYBOOK_RELEASE in .github/workflows/verify-tier.yml is missing or not a vX.Y.Z tag.");
 }
-const pinnedTag = `v${pinnedParts.join(".")}`;
 if (readPlaybookCheckoutRef(workflow) !== "${{ job.workflow_sha }}") {
   fail("The playbook checkout's ref must be job.workflow_sha so the script matches the called workflow's exact commit.");
 }
 
 const tagInput = process.env.RELEASE_TAG;
 if (tagInput !== undefined && tagInput !== "") {
-  const tagParts = parseVersion(tagInput);
-  if (!tagParts) fail("RELEASE_TAG is not a vX.Y.Z tag.");
-  if (`v${tagParts.join(".")}` !== pinnedTag) {
+  if (!isStableTag(tagInput)) fail("RELEASE_TAG is not a vX.Y.Z tag.");
+  if (tagInput !== pinned) {
     fail("The pushed tag does not match PLAYBOOK_RELEASE in .github/workflows/verify-tier.yml. Bump it in the release commit and re-tag.");
   }
 }
 
-const notes = extractChangelogSection(readFileSync("CHANGELOG.md", "utf8"), pinnedParts.join("."));
+const notes = extractChangelogSection(readFileSync("CHANGELOG.md", "utf8"), pinned.slice(1));
 if (notes === "") {
   fail("CHANGELOG.md has no non-empty section for the version PLAYBOOK_RELEASE names. Move the Unreleased notes under that version heading.");
 }
 
 if (process.env.NOTES_OUT) writeFileSync(process.env.NOTES_OUT, `${notes}\n`);
-console.log(`release-check: ${pinnedTag} is consistent (release metadata, source ref and CHANGELOG agree).`);
+console.log(`release-check: ${pinned} is consistent (release metadata, source ref and CHANGELOG agree).`);

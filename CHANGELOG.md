@@ -21,9 +21,11 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   report-only checks on every PR. Adding a workflow does not update GitHub settings.
 - **Tier 3:** verify both the coverage and code-quality gates, including their thresholds
   and merge enforcement. A text match for either tool is not sufficient.
-- **Reusable-workflow callers:** the next release uses GitHub.com's called-workflow source
-  context and fails if it is unavailable. GHES is unsupported. Keep administrative read
-  tokens on trusted settings-check paths, not PR paths.
+- **Reusable-workflow callers:** pin to a published release containing the source-identity
+  fix. `v0.2.0` still checks out the verifier by tag, even when its caller pins a SHA.
+  The fixed workflow uses GitHub.com's called-workflow source context and fails if it is
+  unavailable. GHES is unsupported. Keep administrative read tokens on trusted
+  settings-check paths, not PR paths.
 
 ### Added
 
@@ -58,16 +60,20 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 - Empty required-check lists no longer establish protection, and unreadable classic or
   Rulesets data cannot silently produce a complete pass.
 - API requests retain a fixed GitHub origin and reject redirects.
-- Adoption and release instructions no longer contradict SHA-pinning or source identity.
+- Adoption and release instructions distinguish the source-identity fix from the published
+  `v0.2.0` behavior and keep administrative tokens out of the PR workflow example.
 - The Scorecard recipe now matches this repository's verified v2.5.0 action pin.
 - This repository's dependency review checks newly introduced high and critical vulnerabilities
   in runtime, development, and unknown dependency scopes instead of only runtime.
+- The release guard rejects noncanonical stable tags and requires the pushed tag to match
+  `PLAYBOOK_RELEASE` exactly instead of accepting differently spelled version numbers.
 
 The aggregate gate has passed real PR runs, and `Required CI` is now required in this
 repository's branch protection. A temporary PR with a failing test confirmed that the gate
 fails and GitHub marks the PR as blocked. The protection also applies to administrators.
 CodeQL, dependency review, OSV, and the documentation-impact check have their own required
-contexts. No release or immutable-release setting change is made by this implementation.
+contexts. Immutable releases were enabled for future publications. This does not retroactively
+protect `v0.2.0`.
 
 Cross-repository trials verified that the verifier source is checked out at the called
 workflow's exact SHA and runs on Node.js 26. A declared Tier 2 repository returned
