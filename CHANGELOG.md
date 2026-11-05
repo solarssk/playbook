@@ -13,6 +13,9 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   Read warnings, skips, and manual requirements before claiming compliance.
 - **All tiers, if deviating from a requirement:** record the requirement, tier, reason,
   accountable role, approval, review date, and remediation. A recorded gap is not a pass.
+- **All tiers, if using `codecov/test-results-action`:** replace it with a full-SHA-pinned
+  `codecov/codecov-action` and set `report_type: test_results`. Keep the token and JUnit report
+  paths configured. See the Codecov recipe in `docs/ci-cookbook.md` section 9.
 - **Tier 2 and above:** confirm that every applicable PR gate is actually required,
   directly or through a tested fail-closed aggregate. Do not require scheduled-only or
   report-only checks on every PR. Adding a workflow does not update GitHub settings.
@@ -45,6 +48,8 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 - The playbook's workflows and development setup use Node.js 26, matching its Node.js types.
   Dependabot groups version updates and limits them to one open PR per ecosystem; security
   updates remain separate.
+- The Codecov recipe and this repository's CI use `codecov/codecov-action` for test results as
+  well as coverage. Codecov deprecated the separate test-results action.
 
 ### Fixed
 
