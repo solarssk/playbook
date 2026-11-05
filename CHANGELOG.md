@@ -57,9 +57,10 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 - The Scorecard recipe now matches this repository's verified v2.5.0 action pin.
 
 The aggregate gate has passed real PR runs, and `Required CI` is now required in this
-repository's branch protection. A negative merge-blocking check, the other PR gates, and
-the administrator bypass policy still need review. No release or immutable-release setting
-change is made by this implementation.
+repository's branch protection. A temporary PR with a failing test confirmed that the gate
+fails and GitHub marks the PR as blocked. Administrators can still bypass protection; the
+other PR gates and the administrator bypass policy still need review. No release or
+immutable-release setting change is made by this implementation.
 
 ## [0.2.0] - 2026-09-19
 
