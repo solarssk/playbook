@@ -55,12 +55,14 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 - API requests retain a fixed GitHub origin and reject redirects.
 - Adoption and release instructions no longer contradict SHA-pinning or source identity.
 - The Scorecard recipe now matches this repository's verified v2.5.0 action pin.
+- This repository's dependency review checks newly introduced high and critical vulnerabilities
+  in runtime, development, and unknown dependency scopes instead of only runtime.
 
 The aggregate gate has passed real PR runs, and `Required CI` is now required in this
 repository's branch protection. A temporary PR with a failing test confirmed that the gate
-fails and GitHub marks the PR as blocked. Administrators can still bypass protection; the
-other PR gates and the administrator bypass policy still need review. No release or
-immutable-release setting change is made by this implementation.
+fails and GitHub marks the PR as blocked. The protection also applies to administrators.
+Other PR gates still need their own required contexts. No release or immutable-release
+setting change is made by this implementation.
 
 Cross-repository trials verified that the verifier source is checked out at the called
 workflow's exact SHA and runs on Node.js 26. A declared Tier 2 repository returned

@@ -82,3 +82,20 @@ def test_node_types_major_ignore_applies_only_to_version_updates(dependabot_upda
             "update-types": ["version-update:semver-major"],
         }
     ]
+
+
+def test_dependency_review_covers_all_dependency_scopes():
+    path = ROOT / ".github/workflows/dependency-review.yml"
+    workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["review"]["steps"]
+    reviews = [
+        step for step in steps if step.get("uses", "").startswith("actions/dependency-review-action@")
+    ]
+    assert len(reviews) == 1
+    settings = reviews[0]["with"]
+    assert settings["fail-on-severity"] == "high"
+    assert {scope.strip() for scope in settings.get("fail-on-scopes", "").split(",")} == {
+        "runtime",
+        "development",
+        "unknown",
+    }
