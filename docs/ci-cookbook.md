@@ -1127,8 +1127,8 @@ GitHub's own documented list of workflow permission scopes: it is not in it). Th
 verifies internal consistency (does the PR's own claim match its own diff); it cannot verify
 external consistency (does the doc match a live setting that lives outside any file in the repo).
 
-Closing that second gap for real needs a personal access token with repository administration
-access, stored as a secret, and deliberately kept out of the pull-request-triggered path (a
+Closing that second gap needs a GitHub App installation token or fine-grained personal access
+token with repository Administration: read, deliberately kept out of the pull-request-triggered path (a
 privileged token has no business being reachable from a workflow anyone can trigger by opening a
 PR). The proportionate way to use one: a separate, scheduled workflow, `workflow_dispatch` plus a
 weekly `schedule`, that fetches the live required-checks list with that token and fails loudly
@@ -1163,9 +1163,7 @@ permissions:
 
 jobs:
   verify:
-    uses: solarssk/playbook/.github/workflows/verify-tier.yml@<commit-sha>  # v0.1.1
-    secrets:
-      admin_token: ${{ secrets.PLAYBOOK_ADMIN_TOKEN }}  # optional, see below
+    uses: solarssk/playbook/.github/workflows/verify-tier.yml@<commit-sha>  # v0.2.0
 ```
 
 Pin the reusable workflow call to a commit SHA, not a tag, the same rule as every other `uses:`
@@ -1175,6 +1173,11 @@ means you see and choose the bump, and Dependabot's `github-actions` ecosystem (
 same way it proposes any other Action version bump, comment included, so the tag stays visible next
 to the SHA. Find the SHA for a given release with `git ls-remote --tags
 https://github.com/solarssk/playbook`.
+
+The called workflow checks out the same commit that defines its job, using the validated
+`job.workflow_sha` and `job.workflow_repository` fields. `PLAYBOOK_RELEASE` is only the
+notification baseline. It is not a checkout ref. This requires GitHub.com; GHES is not
+supported. See [source identity and platforms](compatibility.md#source-identity-and-platforms).
 
 The `permissions:` block on the calling workflow is not optional either. Without it, this workflow
 runs with the repository's default `GITHUB_TOKEN` permissions, which on most repositories is
@@ -1186,21 +1189,31 @@ each workflow file needs its own block; a caller does not inherit or narrow the 
 issue and PR templates, SHA-pinning, `permissions:` and `concurrency:` blocks, and a handful of
 keyword-based heuristics (a secret-scan step, a dependency-audit step, SAST, an OpenSSF Scorecard
 workflow, a badge row). It also reports whether a newer playbook release exists than the one the
-call is pinned to (see below). Tier is auto-detected from the calling repo's own `AGENTS.md`.
+call is pinned to (see below). Unless the `tier` input overrides it, the tier is read from the
+first `Tier: N` declaration outside fenced code blocks in the calling repo's `AGENTS.md`, or
+`CLAUDE.md` if `AGENTS.md` does not exist. `N` must be a single digit from `0` to `3`; explanatory
+text may follow after whitespace. The input accepts `auto` or one of `0`, `1`, `2`, and `3`.
+Invalid inputs or declarations fail before any checks run.
 
-**What needs `admin_token`, an optional PAT with repository administration access:**
+**What needs `admin_token`, an optional GitHub App installation token or fine-grained PAT
+with repository Administration: read:**
 delete-branch-on-merge, Dependabot security-updates status, whether branch protection exists
-at all, and whether every required status check matches the name a workflow job actually reports. Skipped and reported as skipped, not silently omitted, if the secret isn't provided. This
+at all, and whether every required status check matches the name a workflow job actually reports.
+Classic protection and active applicable Rulesets are combined. Empty required-check lists
+do not establish protection; an unreadable source leaves the assessment incomplete.
+These checks are reported as skipped, not silently omitted, if the secret isn't provided. This
 is the same limitation described in §12: `administration` isn't a scope a workflow's own
 `permissions:` block can grant, so there is no way to read these without a token that already has
-that access.
+that access. Inject a short-lived installation token or a separately stored PAT only in a
+trusted scheduled or manually dispatched settings-check workflow. Add
+`secrets: {admin_token: ...}` to that trusted caller, not to the PR workflow above.
 
 **How a repo finds out the playbook changed.** Pinning to a SHA means nothing updates silently, so
 the notification has to be deliberate. Two mechanisms carry it, and both depend on the playbook
 publishing a real GitHub Release for every version, not just a tag:
 
-1. **A warning in the check itself.** On every run, `verify-tier` compares the release it is pinned
-   to against the playbook's latest Release. If a newer one exists, the run reports a
+1. **A warning in the check itself.** On every run, `verify-tier` compares its `PLAYBOOK_RELEASE`
+   notification baseline against the playbook's latest Release. If a newer one exists, the run reports a
    `playbook-version` warning and a workflow annotation with a link to the release notes. It
    never fails the build: a new release must not turn every adopter's CI red at once. It is a
    prompt to read the notes and bump the pin.
@@ -1215,11 +1228,11 @@ tier must change to stay in line. A release with no such list changes nothing an
 Keep the `github-actions` Dependabot entry in any repo that calls this workflow. Without it, the
 warning in the workflow run is the only signal, and a warning nobody is looking at gets missed.
 
-A result of "pass" here means the mechanical checks for the declared tier are satisfied. It does
-not mean the repo is actually well-maintained: a keyword match for "gitleaks" doesn't confirm the
-step still runs correctly, and nothing here can judge whether the declared tier itself is still
-the right one. Treat it as a fast, cheap first pass, not a replacement for actually reading the
-repo the way [AGENTS.md](../AGENTS.md)'s own adoption workflow describes.
+The workflow outputs `automated_checks=passed|failed` and `assessment=partial|failed`.
+Exit 0 means no hard check failed, not full tier compliance. Heuristics remain warnings even
+when text matches, and manual requirements stay unassessed. A Tier 3 review must establish
+both coverage and quality gates, their thresholds, and enforcement, not merely a tool name.
+See [verification results](compatibility.md#verification-results) for the exact contract.
 
 ---
 

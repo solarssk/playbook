@@ -1,0 +1,7 @@
+# actionlint 1.7.12 predates these documented GitHub.com job properties.
+# The workflow validates both values before checkout. Review by 2027-02-01.
+# https://github.blog/changelog/2026-09-03-github-actions-early-september-2026-updates/
+paths:
+  .github/workflows/verify-tier.yml:
+    ignore:
+      - '^property "workflow_(sha|repository)" is not defined in object type '

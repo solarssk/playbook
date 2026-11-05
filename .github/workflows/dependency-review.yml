@@ -1,8 +1,7 @@
 name: Dependency review
 
 # Blocks a pull request that introduces a dependency with a known HIGH or
-# CRITICAL vulnerability. For this repository the dependencies are the GitHub
-# Actions it uses.
+# CRITICAL vulnerability in GitHub Actions or the npm/Python development tools.
 on:
   pull_request: {}
 

@@ -74,7 +74,7 @@ practice:
 |---|---|---|---|
 | Require a pull request before merging | Once CI exists | Yes | Yes |
 | Required approving reviews | 0 is fine for a solo maintainer, if written down | 0-1, depending on whether a second maintainer has write access | 1+, once a second maintainer has write access |
-| Require status checks to pass | Named CI job(s), by exact context string | Every check CI actually runs, list kept current as jobs are added/renamed | Same, plus any coverage/quality gates from [tiers.md's Tier 3 list](tiers.md#tier-3-flagship) |
+| Require status checks to pass | Named CI job(s), by exact context string | Every applicable PR gate, directly or through a fail-closed aggregate, kept current as jobs change | Same, plus coverage/quality gates from [tiers.md's Tier 3 list](tiers.md#tier-3-flagship) |
 | Require branches to be up to date before merging | Optional | Recommended if checks are fast | Recommended |
 | Require Code Owner reviews | Off | Off unless a second maintainer has write access | On, once there's someone to route to |
 | Require conversation resolution before merging | Optional | Recommended | Recommended |
@@ -105,7 +105,21 @@ can actually merge after changing the list. With an admin token,
 `verify-tier` compares the required contexts against the job names in the
 repository's workflows and warns about any it cannot match. It cannot tell a
 context posted by an external app (SonarCloud, for example) from a mistyped
-one, so read the warning rather than trusting it blindly.
+one, so read the warning rather than trusting it blindly. It reads classic protection and
+active Rulesets, including inherited rules, but does not establish bypass policy or prove
+that every necessary gate was included.
+
+Do not require scheduled-only, report-only, or conditionally absent external checks on every
+PR. Separate those from merge gates. An aggregate gate is valid only if it always runs,
+depends on every intended gate, and fails when any dependency fails, is cancelled, or is
+skipped. A test should keep its dependency list in sync as CI jobs are added.
+
+This repository's `Required CI` job aggregates the jobs in `ci.yml`. Adding it to YAML does
+not make it required in GitHub settings. Rollout needs a successful real PR run, an
+administrator copying the reported context into protection or a Ruleset, and a negative
+check that a failed dependency actually blocks merging. Other workflows that provide PR
+gates still need their own required contexts. Keep existing required contexts until the
+replacement has been verified.
 
 ## delete_branch_on_merge, conversation resolution, commit signing
 

@@ -1,7 +1,7 @@
 name: OSV-Scanner
 
 # Known-vulnerability scan of every dependency manifest and lockfile in the
-# repository (scripts/requirements.txt) and the GitHub Actions it uses.
+# repository (package-lock.json and scripts/requirements.txt) and its GitHub Actions.
 on:
   pull_request: {}
   schedule:

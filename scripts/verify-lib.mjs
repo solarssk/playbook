@@ -38,13 +38,18 @@ export function findFloatingActionRefs(workflowText) {
   return floating;
 }
 
+// Avoid Number's coercion of empty or otherwise malformed inputs.
+export function parseTier(value) {
+  return ["0", "1", "2", "3"].includes(value) ? Number(value) : null;
+}
+
 // Reads a declared `Tier: N` line from an AGENTS.md-style document. Fenced code
 // blocks are ignored: the playbook's own docs quote the pointer block as an
 // example inside a fence, and that example must not be read as the document's
 // own declaration.
 export function detectDeclaredTier(markdown) {
-  const match = /^Tier:\s*(\d)\b/m.exec(stripFencedBlocks(markdown));
-  return match ? Number(match[1]) : null;
+  const match = /^Tier:[ \t]*(\S*)/m.exec(stripFencedBlocks(markdown));
+  return parseTier(match?.[1]);
 }
 
 // The fence run (three or more backticks or tildes) if `line` is a fence line, else
@@ -73,6 +78,7 @@ function fenceRun(line) {
 // fence; a line scan does not.)
 export function stripFencedBlocks(markdown) {
   const kept = [];
+  /** @type {{ char: string, length: number } | null} */
   let open = null;
   for (const line of markdown.split("\n")) {
     const run = fenceRun(line);
@@ -229,9 +235,8 @@ export function untrustedText(value, maxLength = 200) {
   return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength - 1)}?` : cleaned;
 }
 
-// The literal `ref:` of the step that checks out this repository's own scripts in
-// verify-tier.yml, or null. Read as a literal on purpose: an expression there
-// (`${{ env.X }}`) is something static analysis cannot prove constant. The step is
+// The `ref:` of the step that checks out this repository's own scripts in
+// verify-tier.yml, or null. Release validation accepts only job.workflow_sha. The step is
 // found by its own boundaries (a `- ` list item at any depth starts the next one),
 // so a `ref:` belonging to a different step never counts, and the key order inside
 // the step's `with:` mapping does not matter.
@@ -252,4 +257,30 @@ export function parseRepoSlug(value) {
   const parts = String(value ?? "").split("/");
   const plain = (part) => part.length > 0 && part.length <= 100 && part !== "." && part !== ".." && /^[A-Za-z0-9_.-]+$/.test(part);
   return parts.length === 2 && parts.every(plain) ? { owner: parts[0], repo: parts[1] } : null;
+}
+
+// Keep an API-supplied branch inside one URL segment, including branches containing "/".
+export function encodeBranchName(value) {
+  if (typeof value !== "string" || value.length === 0 || value.length > 1024 ||
+      value === "@" || value.endsWith(".") || value.includes("..") || value.includes("@{") ||
+      /[\u0000-\u0020\u007f~^:?*[\]\\]/.test(value) ||
+      value.split("/").some((part) => part === "" || part.startsWith(".") || part.endsWith(".lock"))) {
+    throw new Error("Invalid default branch name");
+  }
+  return encodeURIComponent(value);
+}
+
+export function rulesetStatusCheckContexts(rules) {
+  if (!Array.isArray(rules)) throw new Error("The branch rules response is not an array");
+  const contexts = [];
+  for (const rule of rules) {
+    if (!rule || typeof rule.type !== "string") throw new Error("Invalid branch rule");
+    if (rule.type !== "required_status_checks") continue;
+    const checks = rule.parameters?.required_status_checks;
+    if (!Array.isArray(checks) || checks.some((check) => typeof check?.context !== "string" || check.context.length === 0)) {
+      throw new Error("Invalid required status checks in branch rules");
+    }
+    contexts.push(...checks.map((check) => check.context));
+  }
+  return [...new Set(contexts)];
 }

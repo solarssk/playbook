@@ -32,7 +32,7 @@ function checksInTable() {
 
 function checksInScript() {
   const checks = new Map();
-  for (const [, tier, id] of script.matchAll(/record\((\d), "([a-z0-9-]+)"/g)) {
+  for (const [, tier, id] of script.matchAll(/record(?:Heuristic)?\((\d), "([a-z0-9-]+)"/g)) {
     if (!NOT_IN_TABLE.has(id)) checks.set(id, Number(tier));
   }
   return checks;

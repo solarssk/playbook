@@ -56,9 +56,15 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: "3.12"
+      - name: Install hash-pinned dependencies
+        run: npm ci --ignore-scripts
       - name: Install hash-pinned Python dependencies
         run: |
           python -m pip install --require-hashes --only-binary :all: --no-deps -r scripts/requirements.txt
+      - name: Static type checks
+        run: |
+          npm run typecheck
+          python -m mypy --check-untyped-defs scripts/validate_yaml.py scripts/check_doc_snippets.py
       - name: Scripts are syntactically valid
         run: |
           set -euo pipefail
@@ -79,7 +85,7 @@ jobs:
           python -m pytest scripts/ \
             --cov=scripts --cov-report=xml:coverage/coverage.xml \
             --junitxml=junit-python.xml
-      - name: Release bookkeeping agrees (workflow pin and CHANGELOG)
+      - name: Release metadata, source ref and CHANGELOG agree
         run: node scripts/release-check.mjs
 
       - name: Upload coverage to Codecov
@@ -216,3 +222,20 @@ jobs:
         env:
           SCAN_RANGE: ${{ steps.range.outputs.range }}
         run: gitleaks detect --source . --log-opts="$SCAN_RANGE" --exit-code 1
+
+  required-ci:
+    name: Required CI
+    if: always()
+    needs: [lint-markdown, validate-yaml, test, lint-workflows, self-verify, secret-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: "22"
+      - name: Require every CI job to succeed
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: node scripts/check-required-ci.mjs

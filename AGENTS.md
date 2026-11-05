@@ -30,7 +30,8 @@ asked to bring it in line with this standard, or to check whether it already is.
    every requirement, by tier, and which `verify-tier` check covers it.
 3. **Check what's actually already there before proposing changes.** Read the real files and the
    real repository settings (`gh api repos/<owner>/<repo>`, `gh api
-   repos/<owner>/<repo>/branches/<default>/protection`). Don't infer compliance from a README
+   repos/<owner>/<repo>/branches/<default>/protection`, and `gh api
+   repos/<owner>/<repo>/rules/branches/<default>`). Don't infer compliance from a README
    claim, a comment, or what a previous PR *said* it did. A past attempt at a fix can be partial,
    buggy, or silently reverted; verify against the artifact, not the description of it. This
    matters especially for anything CI-shaped: read the actual workflow YAML, not just its
@@ -44,8 +45,8 @@ asked to bring it in line with this standard, or to check whether it already is.
    reads as an oversight later.
 6. **Optionally, wire up automatic verification** so future drift gets caught without another
    agent re-reading the whole repo: add a workflow that calls
-   [.github/workflows/verify-tier.yml](.github/workflows/verify-tier.yml), pinned to a released
-   tag. See [docs/ci-cookbook.md #13](docs/ci-cookbook.md#13-verifying-a-repo-against-this-standard-automatically)
+   [.github/workflows/verify-tier.yml](.github/workflows/verify-tier.yml), pinned to the full
+   commit SHA of a release. See [docs/ci-cookbook.md #13](docs/ci-cookbook.md#13-verifying-a-repo-against-this-standard-automatically)
    for the exact call and what it can and can't check on its own.
 
 To make step 1 discoverable without re-deriving it every time, that repository's own AGENTS.md
@@ -62,8 +63,10 @@ have to re-derive the tier from scratch.
 
 ## Repository standard
 
-This repository is held to the standard it publishes, and CI enforces it: the `self-verify` job
-runs `scripts/verify-tier.mjs` against this repository.
+This repository is held to the standard it publishes. The `self-verify` job runs
+`scripts/verify-tier.mjs` against this repository's mechanically checkable subset.
+A green job is a partial assessment, not proof of full compliance. Live settings and
+manual requirements need separate review. See [docs/compatibility.md](docs/compatibility.md).
 
 Tier: 2 (see [docs/tiers.md](docs/tiers.md))
 
@@ -111,10 +114,12 @@ at flagship scale, not picked.
   so write it for someone who has not read the rest of the entry. Omit it when nothing is
   required of adopters.
 - **A release is a tag plus a Release.** Update `CHANGELOG.md` (move `Unreleased` under the new
-  version heading), `PLAYBOOK_RELEASE`, and the literal `ref:` of the playbook checkout step, both
-  in `.github/workflows/verify-tier.yml`, in the same commit, merge it, then push a `vX.Y.Z` tag on that commit. `.github/workflows/release.yml`
-  refuses to publish if the two disagree with the tag, then creates the GitHub Release from the
-  CHANGELOG section. Adopters are notified through that Release, not through the tag.
+  version heading) and `PLAYBOOK_RELEASE` in `.github/workflows/verify-tier.yml` in the same
+  commit, merge it, then push a `vX.Y.Z` tag on that commit. Keep the playbook checkout at
+  `${{ job.workflow_sha }}`, not a version tag or a caller context.
+  `.github/workflows/release.yml` rejects mismatched release metadata or a changed source-ref
+  contract, then publishes the CHANGELOG section. See
+  [docs/compatibility.md](docs/compatibility.md) for compatibility and release limitations.
 
 ## Agent-instruction files across tools
 
@@ -142,6 +147,7 @@ any one of them is updated.
 |---|---|
 | [README.md](README.md) | Human-facing overview: what this is, how to adopt it |
 | [docs/tiers.md](docs/tiers.md) | The tier system. Start here for "what does my repo need" |
+| [docs/compatibility.md](docs/compatibility.md) | Public interfaces, result semantics, versioning, deviations, and source identity |
 | [docs/readme-standard.md](docs/readme-standard.md) | How a README should be structured, per tier |
 | [docs/ci-cookbook.md](docs/ci-cookbook.md) | Copy-paste recipes: CodeQL, Semgrep, gitleaks, Dependabot, Trivy, Codecov, SonarCloud, concurrency, SHA-pinning |
 | [docs/openssf.md](docs/openssf.md) | OpenSSF Scorecard (Tier 2, report-only) and the Best Practices badge (Tier 3, passing level) |
