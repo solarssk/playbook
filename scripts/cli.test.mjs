@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { join, resolve } from "node:path";
 import { after, test } from "node:test";
 
-// Runs the three command-line scripts as real child processes, the way CI does, against fixture
+// Runs command-line scripts as real child processes, the way CI does, against fixture
 // directories. The fixtures live under coverage/ (git-ignored), not in the system temp directory.
 
 const REPO = resolve(import.meta.dirname, "..");
@@ -30,10 +30,11 @@ function write(dir, path, text) {
   writeFileSync(full, text);
 }
 
-// Answers fetch() from the MOCK_FETCH environment variable: a map from a URL suffix to
-// { status, body }. A URL that matches nothing throws, like a network failure.
+// File-backed routes avoid per-variable environment limits on large pagination fixtures.
+// A URL that matches nothing throws, like a network failure.
 const MOCK_FETCH = `data:text/javascript,${encodeURIComponent(`
-const routes = JSON.parse(process.env.MOCK_FETCH ?? "{}");
+import { readFileSync } from "node:fs";
+const routes = JSON.parse(readFileSync(process.env.MOCK_FETCH_FILE, "utf8"));
 globalThis.fetch = async (url) => {
   const key = Object.keys(routes).find((suffix) => String(url).endsWith(suffix));
   if (key === undefined) throw new Error("unmocked request");
@@ -41,13 +42,21 @@ globalThis.fetch = async (url) => {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 };`)}`;
 
-const CLEARED = ["GITHUB_EVENT_PATH", "GITHUB_STEP_SUMMARY", "GITHUB_OUTPUT", "GITHUB_REPOSITORY", "INPUT_TIER", "ADMIN_TOKEN", "GH_TOKEN", "PLAYBOOK_RELEASE", "RELEASE_TAG", "NOTES_OUT", "MOCK_FETCH", "CI_NEEDS"];
+const CLEARED = ["GITHUB_EVENT_PATH", "GITHUB_STEP_SUMMARY", "GITHUB_OUTPUT", "GITHUB_REPOSITORY", "INPUT_TIER", "ADMIN_TOKEN", "GH_TOKEN", "PLAYBOOK_RELEASE", "RELEASE_TAG", "NOTES_OUT", "MOCK_FETCH", "MOCK_FETCH_FILE", "CI_NEEDS"];
 
 function run(script, { cwd = REPO, env = {}, mock = false } = {}) {
   const base = { ...process.env };
   for (const key of CLEARED) delete base[key];
+  const childEnv = { ...base, ...env };
+  if (mock) {
+    const routes = join(fixture(), "fetch-routes.json");
+    writeFileSync(routes, childEnv.MOCK_FETCH ?? "{}");
+    delete childEnv.MOCK_FETCH;
+    childEnv.MOCK_FETCH_FILE = routes;
+  }
   const args = mock ? ["--import", MOCK_FETCH] : [];
-  const result = spawnSync(process.execPath, [...args, join(SCRIPTS, script)], { cwd, env: { ...base, ...env }, encoding: "utf8" });
+  const result = spawnSync(process.execPath, [...args, join(SCRIPTS, script)], { cwd, env: childEnv, encoding: "utf8" });
+  if (result.error) throw result.error;
   return { code: result.status, out: result.stdout, err: result.stderr };
 }
 
