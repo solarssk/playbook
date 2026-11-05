@@ -62,7 +62,7 @@ permissions:
 env:
   # Bump with the CHANGELOG in each release commit. Source identity comes from
   # job.workflow_sha, independently of this release-notification metadata.
-  PLAYBOOK_RELEASE: v0.2.0
+  PLAYBOOK_RELEASE: v0.3.0
 
 jobs:
   verify:
