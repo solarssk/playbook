@@ -52,7 +52,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
         with:
-          node-version: "22"
+          node-version: "26"
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: "3.12"
@@ -172,7 +172,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
         with:
-          node-version: "22"
+          node-version: "26"
       # This repository is held to the same checklist it publishes. Warnings
       # are worth reading; a failing check fails the build.
       - name: verify-tier
@@ -234,7 +234,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
         with:
-          node-version: "22"
+          node-version: "26"
       - name: Require every CI job to succeed
         env:
           CI_NEEDS: ${{ toJSON(needs) }}

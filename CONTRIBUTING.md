@@ -26,7 +26,7 @@ proposing a change to the standard.
 
 ## Development setup
 
-There is nothing to build. Use Node.js 22 and Python 3.12. In a Python virtual environment,
+There is nothing to build. Use Node.js 26 and Python 3.12. In a Python virtual environment,
 install the development tools from the lockfiles:
 
 ```bash
@@ -50,6 +50,13 @@ python scripts/check_doc_snippets.py  # every YAML/JSON snippet in the docs pars
 The verifier itself still runs with Node.js alone; npm packages are development tools.
 The `Required CI` job aggregates `ci.yml` and fails on failed, cancelled, or skipped jobs.
 It does not configure branch protection. See [the rollout procedure](docs/governance.md#branch-protection).
+
+Dependabot groups version updates and allows one open version-update PR per ecosystem. CodeQL
+updates remain a separate group from other Actions. Security updates use a separate limit and
+can still overlap. Update `@types/node` and the Node.js version in every workflow together;
+Dependabot ignores major version updates to the types until that coordinated change is made.
+Dependabot adds the `type: chore` label. During triage, assign the PR and select the active release
+milestone.
 
 ### Workflow-linter compatibility
 

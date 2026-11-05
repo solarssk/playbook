@@ -9,20 +9,42 @@ updates:
     # updates ignore the cooldown.
     cooldown:
       default-days: 7
+    open-pull-requests-limit: 1
+    labels: ["dependencies", "github_actions", "type: chore"]
     # init and analyze must stay on the same version, so they update as one PR.
     groups:
       codeql-action:
         patterns:
           - "github/codeql-action/*"
+      other-actions:
+        patterns:
+          - "*"
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
     cooldown:
       default-days: 7
+    open-pull-requests-limit: 1
+    labels: ["dependencies", "javascript", "type: chore"]
+    # Keep the Node API types aligned with the runtime used by the workflows.
+    # Version-update ignores do not suppress security updates.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
   - package-ecosystem: "pip"
     directory: "/scripts"
     schedule:
       interval: "weekly"
     cooldown:
       default-days: 7
+    open-pull-requests-limit: 1
+    labels: ["dependencies", "python", "type: chore"]
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"

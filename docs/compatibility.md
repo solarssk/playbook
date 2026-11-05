@@ -56,7 +56,8 @@ can bypass them.
 Pin a caller's `uses:` reference to a full commit SHA. On GitHub.com, the called workflow
 checks out its own `${{ job.workflow_sha }}`, after validating the source SHA and repository.
 It does not use a mutable release tag, `github.sha`, or the caller's `github.workflow_sha`.
-The verifier has no npm runtime dependency.
+The workflow runs the verifier on Node.js 26 regardless of the caller's Node.js setup. The
+verifier has no npm runtime dependency.
 
 These `job` fields were [introduced on GitHub.com in September 2026](https://github.blog/changelog/2026-09-03-github-actions-early-september-2026-updates/).
 GitHub Enterprise Server is not supported by this workflow. Missing source identity fails

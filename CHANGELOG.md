@@ -42,6 +42,9 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 - Token guidance covers GitHub App installation tokens as well as fine-grained PATs.
 - Branch-protection guidance distinguishes applicable merge gates from reports and
   documents the separate live-settings rollout.
+- The playbook's workflows and development setup use Node.js 26, matching its Node.js types.
+  Dependabot groups version updates and limits them to one open PR per ecosystem; security
+  updates remain separate.
 
 ### Fixed
 
@@ -53,9 +56,10 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 - Adoption and release instructions no longer contradict SHA-pinning or source identity.
 - The Scorecard recipe now matches this repository's verified v2.5.0 action pin.
 
-The aggregate gate still needs a verified PR run and an administrator's protection-setting
-change. No release, immutable-release setting, or live branch-protection change is made by
-this implementation.
+The aggregate gate has passed real PR runs, and `Required CI` is now required in this
+repository's branch protection. A negative merge-blocking check, the other PR gates, and
+the administrator bypass policy still need review. No release or immutable-release setting
+change is made by this implementation.
 
 ## [0.2.0] - 2026-09-19
 
