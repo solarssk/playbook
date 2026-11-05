@@ -41,7 +41,11 @@ globalThis.fetch = async (url, options) => {
   }
   const key = Object.keys(routes).find((suffix) => String(url).endsWith(suffix));
   if (key === undefined) throw new Error("unmocked request");
-  const { status = 200, body = {} } = routes[key];
+  const { status = 200, body = {}, authorization } = routes[key];
+  if (authorization !== undefined && options.headers.Authorization !== authorization) {
+    throw new Error("Unexpected API authorization header");
+  }
+  if (Object.hasOwn(routes[key], "throws")) throw routes[key].throws;
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 };`)}`;
 
@@ -298,6 +302,56 @@ test("verify-tier handles no protection, API errors, and a missing analysis sect
   assert.match(settings({ "repos/o/r": { body: { delete_branch_on_merge: true } }, graphql: protectionReply(null) }).out, /security_and_analysis not present/);
 });
 
+test("verify-tier reports disabled repository settings without claiming they pass", () => {
+  const result = settings({
+    "repos/o/r": { body: {
+      ...REPO_OK, delete_branch_on_merge: false,
+      security_and_analysis: { dependabot_security_updates: { status: "disabled" } },
+    } },
+    graphql: protectionReply([]),
+  });
+  assert.match(result.out, /\| ⚠️ warn \| Automatically delete head branches enabled/);
+  assert.match(result.out, /delete_branch_on_merge is false/);
+  assert.match(result.out, /\| ⚠️ warn \| Dependabot security updates enabled/);
+  assert.match(result.out, /Status: disabled/);
+});
+
+test("verify-tier sanitizes non-Error failures without leaking them into the summary", () => {
+  const summary = join(fixture(), "summary.md");
+  const result = settings({
+    "repos/o/r": { body: REPO_OK },
+    graphql: { throws: "<b>untrusted|failure" },
+  }, { GITHUB_STEP_SUMMARY: summary });
+  assert.match(result.out, /Could not complete: \?b\?untrusted\?failure/);
+  assert.match(result.out, /Protection could not be fully assessed/);
+  assert.doesNotMatch(readFileSync(summary, "utf8"), /untrusted|failure/);
+});
+
+test("verify-tier rejects missing or malformed classic protection data", () => {
+  for (const body of [
+    {},
+    { data: { repository: {} } },
+    protectionReply([null]).body,
+    protectionReply([""]).body,
+    { data: { repository: { defaultBranchRef: { name: "main" } } } },
+  ]) {
+    const result = settings({ "repos/o/r": { body: REPO_OK }, graphql: { body } });
+    assert.match(result.out, /Missing default branch response|Invalid classic required status checks response/);
+    assert.match(result.out, /Protection could not be fully assessed/);
+    assert.doesNotMatch(result.out, /\| ✅ pass \| Required CI checks protected/);
+  }
+});
+
+test("verify-tier skips branch rules when the repository has no default branch", () => {
+  const result = settings({
+    "repos/o/r": { body: { ...REPO_OK, default_branch: null } },
+    graphql: { body: { data: { repository: { defaultBranchRef: null } } } },
+    [RULES]: { status: 500 },
+  });
+  assert.match(result.out, /No required status checks found/);
+  assert.doesNotMatch(result.out, /GET branch rules|Could not read active branch rules/);
+});
+
 test("verify-tier accepts Rulesets-only protection and combines it with classic checks", () => {
   for (const classic of [null, ["lint-markdown"]]) {
     const result = settings({
@@ -381,9 +435,16 @@ test("verify-tier skips the settings checks without an admin token", () => {
   assert.match(run("verify-tier.mjs", { env: { INPUT_TIER: "0" } }).out, /No admin_token secret provided/);
 });
 
-function versionCheck(pinned, routes) {
-  return run("verify-tier.mjs", { env: { INPUT_TIER: "0", PLAYBOOK_RELEASE: pinned, MOCK_FETCH: JSON.stringify(routes) }, mock: true });
+function versionCheck(pinned, routes, extraEnv = {}) {
+  return run("verify-tier.mjs", { env: { INPUT_TIER: "0", PLAYBOOK_RELEASE: pinned, MOCK_FETCH: JSON.stringify(routes), ...extraEnv }, mock: true });
 }
+
+test("verify-tier authenticates the release lookup when a read token is provided", () => {
+  const result = versionCheck("v1.0.0", {
+    "releases/latest": { authorization: "Bearer token", body: { tag_name: "v1.0.0" } },
+  }, { GH_TOKEN: "token" });
+  assert.match(result.out, /\| ✅ pass \| Pinned to the latest playbook release/);
+});
 
 test("verify-tier warns, without failing, when a newer playbook release exists", () => {
   const result = versionCheck("v0.1.0", { "releases/latest": { body: { tag_name: "v9.0.0" } } });
@@ -448,9 +509,33 @@ test("verify-tier never certifies scanner execution, disabled steps or quality g
   }
 });
 
+test("verify-tier rejects floating refs in YAML workflows and bounds the reported list", () => {
+  for (const count of [1, 9]) {
+    const dir = fixture();
+    write(dir, "LICENSE", "license\n");
+    write(dir, ".github/CODEOWNERS", "* @<maintainer-handle>\n");
+    write(dir, "SECURITY.md", "# Security\n");
+    write(dir, ".github/ISSUE_TEMPLATE/bug.md", "# Bug report\n");
+    const steps = Array.from({ length: count }, (_, index) => `      - uses: example/action-${index}@main`);
+    write(dir, ".github/workflows/ci.yaml", ["on: push", "jobs:", "  test:", "    runs-on: ubuntu-latest", "    steps:", ...steps].join("\n"));
+    const result = run("verify-tier.mjs", { cwd: dir, env: { INPUT_TIER: "1" } });
+    assert.equal(result.code, 1);
+    assert.match(result.out, /\| ❌ fail \| GitHub Actions pinned to a commit SHA/);
+    assert.match(result.out, /\| ✅ pass \| At least one structured issue template/);
+    assert.match(result.out, /example\/action-0@main \(ci.yaml\)/);
+    if (count === 9) {
+      assert.match(result.out, /example\/action-7@main \(ci.yaml\), \.\.\./);
+      assert.doesNotMatch(result.out, /example\/action-8/);
+    }
+  }
+});
+
 test("required-ci fails for empty, failed, cancelled, skipped and malformed results", () => {
+  const missing = run("check-required-ci.mjs");
+  assert.equal(missing.code, 1);
+  assert.match(missing.err, /results are missing or invalid/);
   assert.equal(run("check-required-ci.mjs", { env: { CI_NEEDS: '{"test":{"result":"success"}}' } }).code, 0);
-  for (const input of ["", "not-json", "null", "[]", "{}", '{"test":{}}',
+  for (const input of ["", "not-json", "null", "true", "1", '"success"', "[]", "{}", '{"test":{}}', '{"test":null}',
     '{"test":{"result":"failure"}}', '{"test":{"result":"cancelled"}}', '{"test":{"result":"skipped"}}',
     '{"test":{"result":"success"},"lint":{"result":"failure"}}']) {
     assert.equal(run("check-required-ci.mjs", { env: { CI_NEEDS: input } }).code, 1, input);
