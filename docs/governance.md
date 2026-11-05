@@ -1,13 +1,13 @@
-# Repository Governance
+# Repository governance
 
-This document is the deep-dive companion to the ownership, review, and
-repo-settings items in [docs/tiers.md](tiers.md)'s per-tier checklists, the
-same relationship [readme-standard.md](readme-standard.md) has to that
-checklist's README item. It uses the exact same tiers: **Tier 0** (every
-repository), **Tier 1** (small, single-purpose tools), **Tier 2** (public
-tools with real dependents), **Tier 3** (flagship). If a repo's tier hasn't
-been picked yet, start at [tiers.md, "How to pick a tier"](tiers.md#how-to-pick-a-tier)
-before reading further here.
+Configure ownership, merge gates, labels, and repository settings for the
+[tier checklist](tiers.md). If the tier is unknown, start with [how to pick a tier](tiers.md#how-to-pick-a-tier).
+
+- [CODEOWNERS](#codeowners)
+- [Branch protection](#branch-protection)
+- [Branch cleanup, conversation resolution, and signing](#delete_branch_on_merge-conversation-resolution-commit-signing)
+- [Labels and milestones](#labels-and-milestones)
+- [Tier 0 security toggles](#tier-0-security-toggles-in-full)
 
 ## CODEOWNERS
 
@@ -22,21 +22,14 @@ mechanism, unless paired with the branch-protection setting described below.
 * @<maintainer-handle>
 ```
 
-This documents ownership (useful the moment a second person needs to know who
-to ask) before there's any structure to route between. Do not create
-path-scoped entries on top of this for a single-maintainer repo: there is no
-one else to route reviews to, so extra lines are pure noise regardless of the
-repo's tier.
+Choose ownership scope by maintainer count, not tier:
 
-**Path-specific ownership, once there are multiple maintainers:** worth the
-added complexity once a repo has more than one person with write access, each
-covering a different area. The trigger here is **headcount**, not tier by
-itself. A Tier 3 flagship repo with a single maintainer still gets the plain
-catch-all line, and a smaller repo that unusually picks up a second
-maintainer can adopt path-specific ownership early. In practice the two
-correlate (repos accumulate a second maintainer more often once they're
-Tier 2+), but headcount is the real signal to watch. Once it applies, scope
-entries to the paths each owner actually knows:
+| Maintainers | Ownership |
+|---|---|
+| One, at any tier | Catch-all only; path entries cannot route to anyone else |
+| Multiple people with write access, covering different areas | Path-specific entries for the areas each owner knows |
+
+For multiple maintainers:
 
 ```text
 * @<default-owner>
@@ -49,26 +42,15 @@ entries to the paths each owner actually knows:
 More specific patterns win over less specific ones (last match in the file
 also wins on a tie), so put the catch-all first and overrides after it.
 
-**"Require review from Code Owners" (branch protection setting):** this
-toggle is **inert** on a solo-maintainer repo. The sole owner would be both
-the author and the required reviewer, and GitHub does not let an author
-approve their own PR to satisfy the rule, so it just blocks merges until
-someone manually overrides. Turn it on only once a second collaborator with
-write access can actually provide that review. Until then, CODEOWNERS still
-does its job (auto-requesting review as documentation of who's responsible)
-without the enforcement toggle.
+Enable **Require review from Code Owners** only when a second collaborator with write access
+can review. Authors cannot approve their own PRs; requiring it on a solo-maintainer repo blocks
+merges until an override. Keep CODEOWNERS for routing and ownership documentation without that toggle.
 
 ## Branch protection
 
-[tiers.md's Tier 0 checklist](tiers.md#tier-0-every-repository) already
-requires branch protection on the default branch once any CI exists, with at
-least the CI's own status checks required, and explicitly allows the
-required-review count to stay at 0 for a solo-maintained repo, as long as
-that's a deliberate, written-down choice, revisited the moment a second
-person gets write access. Tier 2 tightens this from "present" to "actually
-enforced": required status checks that are genuinely required, not merely
-present as unenforced workflow files. This section is what that looks like in
-practice:
+Protect the default branch once any CI exists. At Tier 0, require at least CI's own checks;
+at Tier 2, enforce every applicable PR gate. A solo-maintainer review count of 0 must be
+documented and revisited when a second person gets write access.
 
 | Setting | Tier 0-1 baseline | Tier 2: actually enforced | Tier 3: flagship |
 |---|---|---|---|
@@ -80,46 +62,34 @@ practice:
 | Require conversation resolution before merging | Optional | Recommended | Recommended |
 | Require signed commits | Optional | Optional | Recommended for compliance-sensitive repos |
 
-**On "required reviewers = 0":** for a solo-maintainer repo, requiring a
-second approval that cannot exist is not a safeguard. It's a self-imposed
-deadlock that gets bypassed via admin override every time, and that trains
-everyone to ignore the setting. Leaving the count at 0 until a second
-collaborator actually has write access is the correct default, but say so
-explicitly (e.g. in `CONTRIBUTING.md`: *"single-maintainer project: the
-maintainer reviews and merges their own PRs once CI is green"*) so it reads
-as a decision, not an oversight a future reader has to guess about.
+For a solo maintainer, keep required reviewers at 0 rather than routinely bypassing an impossible
+approval. Record the decision, for example in `CONTRIBUTING.md`: "Single-maintainer project:
+the maintainer reviews and merges their own PRs once CI is green."
 
-**Required status checks:** name the actual check contexts (job names as
-they appear in the Checks tab), not just "CI". GitHub matches on the exact
-context string, and a renamed job silently stops being enforced if the
-required-checks list isn't updated alongside it.
+Required contexts must exactly match names from a real PR's Checks tab. A job reports its `name:`,
+or its key when no name exists: `secret-scan:` with `name: Secret scan (gitleaks)` reports
+`Secret scan (gitleaks)`, not `secret-scan`. A nonexistent required context leaves PRs blocked
+even when all actual checks are green. Update protection when renaming jobs and confirm a PR can merge.
 
-The opposite mistake is quieter and worse. A job's reported name is its
-`name:` when it has one and its key otherwise, so a job written as
-`secret-scan:` with `name: Secret scan (gitleaks)` reports as
-`Secret scan (gitleaks)`. Requiring the context `secret-scan` then waits for a
-check that never arrives: every pull request stays "blocked" with all checks
-green, and nothing reports an error. Copy each context from the Checks tab of
-a real pull request rather than from the workflow file, and confirm one PR
-can actually merge after changing the list. With an admin token,
-`verify-tier` compares the required contexts against the job names in the
-repository's workflows and warns about any it cannot match. It cannot tell a
-context posted by an external app (SonarCloud, for example) from a mistyped
-one, so read the warning rather than trusting it blindly. It reads classic protection and
-active Rulesets, including inherited rules, but does not establish bypass policy or prove
-that every necessary gate was included.
+With an admin token, `verify-tier` compares required contexts against workflow job names across
+classic protection and active Rulesets, including inherited rules. Its warnings cannot distinguish
+external-app contexts, such as SonarCloud, from typos. It neither establishes bypass policy nor
+proves that every necessary gate is included. See [verification limits](compatibility.md#verification-results).
 
 Do not require scheduled-only, report-only, or conditionally absent external checks on every
 PR. Separate those from merge gates. An aggregate gate is valid only if it always runs,
 depends on every intended gate, and fails when any dependency fails, is cancelled, or is
 skipped. A test should keep its dependency list in sync as CI jobs are added.
 
-This repository's `Required CI` job aggregates the jobs in `ci.yml`. Adding it to YAML does
-not make it required in GitHub settings. Rollout needs a successful real PR run, an
-administrator copying the reported context into protection or a Ruleset, and a negative
-check that a failed dependency actually blocks merging. Other workflows that provide PR
-gates still need their own required contexts. Keep existing required contexts until the
-replacement has been verified.
+This repository's `Required CI` aggregates `ci.yml`; YAML alone does not make it required.
+Roll out a replacement gate in this order:
+
+1. Obtain a successful real PR run.
+2. Have an administrator copy its reported context into protection or a Ruleset.
+3. Confirm a failed dependency blocks merging.
+4. Only then remove superseded required contexts.
+
+Other workflows providing PR gates still need their own required contexts.
 
 ## delete_branch_on_merge, conversation resolution, commit signing
 
@@ -163,14 +133,9 @@ Skip `area:` entirely for a repo small enough that "where" is obvious from
 the title. Skip `prio:` if there's one maintainer triaging their own backlog:
 priority is already implicit in what they work on next.
 
-**When a larger taxonomy earns its keep:** once there's enough issue volume
-that someone is filtering views regularly, a project board, a weekly triage
-pass, multiple maintainers picking up work independently, which in practice
-tends to show up around Tier 2-3, add what's actually used: severity levels
-distinct from priority, `status:` labels for triage state,
-`good-first-issue` for external contributors, or component labels finer than
-a single `area:` bucket. Add labels because a filter is missing, not
-speculatively.
+Expand labels when regular filtering, triage, a project board, or independent maintainers need
+them, usually around Tier 2-3. Options include severity distinct from priority, `status:`,
+`good-first-issue`, and finer component labels. Add a label for a missing filter, not speculatively.
 
 **Milestones:** use them for actual release planning (grouping issues/PRs
 targeted at a specific version) once a repo cuts versioned releases with any
