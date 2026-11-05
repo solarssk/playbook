@@ -49,6 +49,7 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   of silently selecting the wrong tier or passing without running any checks.
 - Empty required-check lists no longer establish protection, and unreadable classic or
   Rulesets data cannot silently produce a complete pass.
+- API requests retain a fixed GitHub origin and reject redirects.
 - Adoption and release instructions no longer contradict SHA-pinning or source identity.
 - The Scorecard recipe now matches this repository's verified v2.5.0 action pin.
 

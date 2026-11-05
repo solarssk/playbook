@@ -149,6 +149,7 @@ async function checkPlaybookVersion() {
     if (process.env.GH_TOKEN) headers.Authorization = `Bearer ${process.env.GH_TOKEN}`;
     const response = await fetch("https://api.github.com/repos/solarssk/playbook/releases/latest", {
       headers,
+      redirect: "error",
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) throw new Error(`GET releases/latest: ${response.status}`);
@@ -262,15 +263,21 @@ function checkRepository(repo) {
     "Dependabot security updates are not enabled. The job log has the reported status.", `Status: ${untrustedText(status)}.`);
 }
 
-async function apiJson(url, headers, label, options = {}) {
-  const response = await fetch(url, { ...options, headers, signal: AbortSignal.timeout(10_000) });
+/** @param {RequestInit & {searchParams?: Record<string, string>}} options */
+async function apiJson(path, headers, label, options = {}) {
+  const { searchParams, ...requestOptions } = options;
+  // Path and query setters cannot change the fixed API origin.
+  const url = new URL("https://api.github.com");
+  url.pathname = path;
+  url.search = new URLSearchParams(searchParams).toString();
+  const response = await fetch(url, { ...requestOptions, headers, redirect: "error", signal: AbortSignal.timeout(10_000) });
   if (!response.ok) throw new Error(`${label}: ${response.status}`);
   return response.json();
 }
 
 async function requiredStatusChecks(slug, headers) {
   const query = "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){defaultBranchRef{name branchProtectionRule{requiredStatusCheckContexts}}}}";
-  const payload = await apiJson("https://api.github.com/graphql", { ...headers, "Content-Type": "application/json" }, "POST graphql", {
+  const payload = await apiJson("/graphql", { ...headers, "Content-Type": "application/json" }, "POST graphql", {
     method: "POST",
     body: JSON.stringify({ query, variables: { owner: slug.owner, name: slug.repo } }),
   });
@@ -293,8 +300,8 @@ async function rulesetStatusChecks(slug, branch, headers) {
   const contexts = [];
   for (let page = 1; page <= 100; page += 1) {
     const rules = await apiJson(
-      `https://api.github.com/repos/${slug.owner}/${slug.repo}/rules/branches/${encoded}?per_page=100&page=${page}`,
-      headers, "GET branch rules",
+      `/repos/${slug.owner}/${slug.repo}/rules/branches/${encoded}`,
+      headers, "GET branch rules", { searchParams: { per_page: "100", page: String(page) } },
     );
     contexts.push(...rulesetStatusCheckContexts(rules));
     if (rules.length < 100) return contexts;
@@ -347,7 +354,7 @@ async function checkSettings(token) {
   }
   let repo;
   try {
-    repo = await apiJson(`https://api.github.com/repos/${slug.owner}/${slug.repo}`, headers, `GET /repos/${slug.owner}/${slug.repo}`);
+    repo = await apiJson(`/repos/${slug.owner}/${slug.repo}`, headers, `GET /repos/${slug.owner}/${slug.repo}`);
     checkRepository(repo);
   } catch (error) {
     record(0, "settings", "Repo-settings checks", "warn", "Could not complete the repo-settings checks. The job log has the reason.",
@@ -409,10 +416,12 @@ const automatedChecks = failures.length > 0 ? "failed" : "passed";
 const assessment = failures.length > 0 ? "failed" : "partial";
 
 function renderTable(field) {
-  const lines = [`# Playbook tier verification (declared: Tier ${declaredTier})`, ""];
-  lines.push(`Automated checks: **${automatedChecks}**. Assessment: **${assessment}**.`, "",
-    "This run does not certify full Tier compliance. Manual requirements, heuristic findings, applicability and effective enforcement need review.", "");
-  lines.push("| Status | Check | Detail | ID |", "|---|---|---|---|");
+  const lines = [
+    `# Playbook tier verification (declared: Tier ${declaredTier})`, "",
+    `Automated checks: **${automatedChecks}**. Assessment: **${assessment}**.`, "",
+    "This run does not certify full Tier compliance. Manual requirements, heuristic findings, applicability and effective enforcement need review.", "",
+    "| Status | Check | Detail | ID |", "|---|---|---|---|",
+  ];
   for (const r of relevant) {
     lines.push(`| ${icon[r.status]} ${r.status} | ${escapeTableCell(r.label)} | ${escapeTableCell(r[field])} | ${r.id} |`);
   }

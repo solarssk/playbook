@@ -35,7 +35,10 @@ function write(dir, path, text) {
 const MOCK_FETCH = `data:text/javascript,${encodeURIComponent(`
 import { readFileSync } from "node:fs";
 const routes = JSON.parse(readFileSync(process.env.MOCK_FETCH_FILE, "utf8"));
-globalThis.fetch = async (url) => {
+globalThis.fetch = async (url, options) => {
+  if (new URL(url).origin !== "https://api.github.com" || options.redirect !== "error") {
+    throw new Error("API requests must retain the fixed origin and reject redirects");
+  }
   const key = Object.keys(routes).find((suffix) => String(url).endsWith(suffix));
   if (key === undefined) throw new Error("unmocked request");
   const { status = 200, body = {} } = routes[key];
