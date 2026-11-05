@@ -56,10 +56,10 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 - Adoption and release instructions no longer contradict SHA-pinning or source identity.
 - The Scorecard recipe now matches this repository's verified v2.5.0 action pin.
 
-The aggregate gate has passed real PR runs. It still needs an administrator's
-protection-setting change and a negative check that a failed dependency blocks merging.
-No release, immutable-release setting, or live branch-protection change is made by this
-implementation.
+The aggregate gate has passed real PR runs, and `Required CI` is now required in this
+repository's branch protection. A negative merge-blocking check, the other PR gates, and
+the administrator bypass policy still need review. No release or immutable-release setting
+change is made by this implementation.
 
 ## [0.2.0] - 2026-09-19
 
