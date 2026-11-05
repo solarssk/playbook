@@ -104,6 +104,7 @@ at flagship scale, not picked.
   phrasing ("it's important to note," "in today's fast-paced world," "leverage," "seamless,"
   "robust," "game-changer"). Say the specific thing. If a sentence would read the same with the
   specifics removed, cut it.
+- **Do not hard-wrap Markdown prose or list items to a fixed column.** Use one physical line per paragraph or list item; the renderer wraps it for display. Preserve code blocks, tables, and other whitespace-sensitive formatting.
 - **Update [CHANGELOG.md](CHANGELOG.md)** for any change that alters what the standard actually
   recommends, not for typo fixes. Repositories that adopted an earlier version benefit from being
   able to see what changed and why.

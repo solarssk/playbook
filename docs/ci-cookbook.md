@@ -1,10 +1,6 @@
 # CI cookbook
 
-Copy-ready recipes for CI security and quality tooling. Apply the recipes for your
-[tier checklist](tiers.md#at-a-glance), not every tool on the page.
-Patterns were verified against real CI configuration; action names and SHAs are starting points,
-not permanent pins. Keep them current with Dependabot (§4). Replace `<owner>/<repo>` and `<org>`
-with the target repository's values.
+Copy-ready recipes for CI security and quality tooling. Apply the recipes for your [tier checklist](tiers.md#at-a-glance), not every tool on the page. Patterns were verified against real CI configuration; action names and SHAs are starting points, not permanent pins. Keep them current with Dependabot (§4). Replace `<owner>/<repo>` and `<org>` with the target repository's values.
 
 ## Tiers
 
@@ -14,9 +10,7 @@ with the target repository's values.
 | **Tier 2** | Public tool with real users or dependents. Ships an artifact (package, container image, plugin) that strangers install and rely on; has an issue tracker other people actually file into. | A published container image on a registry, a public npm/pip package, a plugin distributed to other projects. |
 | **Tier 3** | Flagship / keystone project. Self-hosted product handling sensitive data (auth, personal data, anything payments-adjacent), multi-service architecture: the repo that would cause the most damage if it shipped a vulnerability. | The primary product whose failure would do the most damage. |
 
-Reassess tiers as usage changes. A dormant Tier 2 repo does not need Tier 3 machinery;
-a Tier 1 repo gaining dependents should move up. Use [the tier-selection questions](tiers.md#how-to-pick-a-tier)
-for the decision.
+Reassess tiers as usage changes. A dormant Tier 2 repo does not need Tier 3 machinery; a Tier 1 repo gaining dependents should move up. Use [the tier-selection questions](tiers.md#how-to-pick-a-tier) for the decision.
 
 ## Contents
 
@@ -40,9 +34,7 @@ for the decision.
 
 ## 1. Pin GitHub Actions to a commit SHA
 
-**Why:** a mutable tag such as `uses: owner/action@v4` can change through a maintainer's action
-or account/marketplace compromise, without a diff or review in your repository.
-A full commit SHA fixes the action source until you deliberately update the pin.
+**Why:** a mutable tag such as `uses: owner/action@v4` can change through a maintainer's action or account/marketplace compromise, without a diff or review in your repository. A full commit SHA fixes the action source until you deliberately update the pin.
 
 **When to use it:** all tiers, no exceptions. Use Dependabot to maintain the pins.
 
@@ -55,16 +47,11 @@ steps:
       persist-credentials: false
 ```
 
-Keep an exact trailing `# vX.Y.Z` comment so readers can identify the pinned version.
-GitHub Actions ignores it; Dependabot maintains it only when it already names an exact version.
-Bare aliases such as `# v6` can remain unchanged across major upgrades and become misleading.
+Keep an exact trailing `# vX.Y.Z` comment so readers can identify the pinned version. GitHub Actions ignores it; Dependabot maintains it only when it already names an exact version. Bare aliases such as `# v6` can remain unchanged across major upgrades and become misleading.
 
 **Finding and updating pins:**
 
-- **Preferred, ongoing:** Dependabot's `github-actions` ecosystem. Add it once and Dependabot opens
-  a PR every time a pinned action's tag moves forward, bumping both the SHA and an already-exact
-  version comment together. It does not retroactively fix a comment that was never an exact
-  version to begin with.
+- **Preferred, ongoing:** Dependabot's `github-actions` ecosystem. Add it once and Dependabot opens a PR every time a pinned action's tag moves forward, bumping both the SHA and an already-exact version comment together. It does not retroactively fix a comment that was never an exact version to begin with.
 
   ```yaml
   # .github/dependabot.yml
@@ -82,9 +69,7 @@ Bare aliases such as `# v6` can remain unchanged across major upgrades and becom
             - "github/codeql-action/*"
   ```
 
-  The `cooldown:` block waits a week before proposing a freshly published version (see §4). The `groups:` block is optional. It's worth adding for any action family whose sub-actions are
-  always bumped together (`github/codeql-action/init`, `/autobuild`, `/analyze`,
-  `/upload-sarif`), so a version bump lands as one PR instead of four.
+  The `cooldown:` block waits a week before proposing a freshly published version (see §4). The `groups:` block is optional. It's worth adding for any action family whose sub-actions are always bumped together (`github/codeql-action/init`, `/autobuild`, `/analyze`, `/upload-sarif`), so a version bump lands as one PR instead of four.
 
 - **One-off / manual:** resolve a tag to its commit yourself and copy the SHA:
 
@@ -96,8 +81,7 @@ Bare aliases such as `# v6` can remain unchanged across major upgrades and becom
 
 ## 2. Concurrency groups (cancel on supersede vs never cancel a release)
 
-**Why:** `concurrency:` limits simultaneous runs in a group, reducing duplicate work and out-of-order results.
-CI cancellation and release serialization are **not interchangeable**:
+**Why:** `concurrency:` limits simultaneous runs in a group, reducing duplicate work and out-of-order results. CI cancellation and release serialization are **not interchangeable**:
 
 | Workflow | Policy |
 |---|---|
@@ -106,8 +90,7 @@ CI cancellation and release serialization are **not interchangeable**:
 
 ### a) CI / PR pattern: cancel superseded runs
 
-**When to use it:** every non-release `push`/`pull_request` workflow, all tiers, including CI,
-CodeQL, and Semgrep. Cancel obsolete PR runs, but not trunk runs: the condition below excludes `main`.
+**When to use it:** every non-release `push`/`pull_request` workflow, all tiers, including CI, CodeQL, and Semgrep. Cancel obsolete PR runs, but not trunk runs: the condition below excludes `main`.
 
 ```yaml
 concurrency:
@@ -115,15 +98,11 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 ```
 
-(The identical pattern applies to every non-release workflow: `ci.yml`, `codeql.yml`,
-`semgrep.yml`.)
+(The identical pattern applies to every non-release workflow: `ci.yml`, `codeql.yml`, `semgrep.yml`.)
 
 ### b) Release / publish pattern: never cancel mid-flight
 
-**When to use it:** any workflow with irreversible publishing effects, such as an image push,
-SBOM upload, or GitHub Release creation, usually Tier 2+.
-Cancellation cannot roll back a partial publication and provides no automatic recovery.
-Always set `cancel-in-progress: false`.
+**When to use it:** any workflow with irreversible publishing effects, such as an image push, SBOM upload, or GitHub Release creation, usually Tier 2+. Cancellation cannot roll back a partial publication and provides no automatic recovery. Always set `cancel-in-progress: false`.
 
 ```yaml
 concurrency:
@@ -131,11 +110,7 @@ concurrency:
   cancel-in-progress: false
 ```
 
-If a workflow can target different refs (e.g. `workflow_dispatch` with a `ref` input alongside a
-normal tag push), group by the *resolved, canonicalized* target instead of the workflow name alone.
-A concurrency group holds at most one *running* **and** one *pending* run, not a FIFO queue, so
-grouping too broadly means an unrelated third run (a different tag, a scheduled re-scan with no tag
-at all) can silently replace the pending run and drop a real release with no error anywhere:
+If a workflow can target different refs (e.g. `workflow_dispatch` with a `ref` input alongside a normal tag push), group by the *resolved, canonicalized* target instead of the workflow name alone. A concurrency group holds at most one *running* **and** one *pending* run, not a FIFO queue, so grouping too broadly means an unrelated third run (a different tag, a scheduled re-scan with no tag at all) can silently replace the pending run and drop a real release with no error anywhere:
 
 ```yaml
 concurrency:
@@ -145,10 +120,8 @@ concurrency:
 
 Avoid both publish-workflow failure modes:
 
-- Copying pattern (a): `refs/tags/vX.Y.Z` is not `refs/heads/main`, so its cancellation condition
-  is true on every tag push. A matching retry or follow-up can cancel a partially completed publish.
-- Omitting concurrency: a side-effecting build-and-release step, including a multi-architecture
-  build, does not inherit protection from the CI workflow.
+- Copying pattern (a): `refs/tags/vX.Y.Z` is not `refs/heads/main`, so its cancellation condition is true on every tag push. A matching retry or follow-up can cancel a partially completed publish.
+- Omitting concurrency: a side-effecting build-and-release step, including a multi-architecture build, does not inherit protection from the CI workflow.
 
 Choose the pattern by whether the workflow publishes anything, not by the template it came from.
 
@@ -156,10 +129,7 @@ Choose the pattern by whether the workflow publishes anything, not by the templa
 
 ## 3. Dependency vulnerability audit (pip-audit, npm audit, osv-scanner)
 
-**Why:** Dependabot security updates react to vulnerabilities already in the dependency graph;
-they do not block a PR introducing a vulnerable pin. Audit the proposed manifest in CI before
-merge to catch new or reintroduced known vulnerabilities. These checks need no external account
-or token and can be reproduced against source.
+**Why:** Dependabot security updates react to vulnerabilities already in the dependency graph; they do not block a PR introducing a vulnerable pin. Audit the proposed manifest in CI before merge to catch new or reintroduced known vulnerabilities. These checks need no external account or token and can be reproduced against source.
 
 **When to use it:** Tier 1 and up, no exceptions. Repository size is not a reason to skip it.
 
@@ -179,15 +149,9 @@ or token and can be reproduced against source.
         run: npm audit --omit=dev --audit-level=high
 ```
 
-`--omit=dev` scopes the audit to what actually ships; a dev-only tool's transitive CVE isn't
-runtime exposure, and including it is the most common source of noise that gets this check
-disabled six months in. `--audit-level=high` (or pip-audit's own severity filtering, where
-available) keeps LOW/MEDIUM findings visible without blocking on them.
+`--omit=dev` scopes the audit to what actually ships; a dev-only tool's transitive CVE isn't runtime exposure, and including it is the most common source of noise that gets this check disabled six months in. `--audit-level=high` (or pip-audit's own severity filtering, where available) keeps LOW/MEDIUM findings visible without blocking on them.
 
-**Pattern (language-agnostic, OSV database, for a stack pip-audit/npm audit don't cover):**
-call the reusable workflows this project publishes for exactly this purpose, not its underlying
-action directly. The action's own `action.yml` says plainly it isn't meant for direct use, since
-its behavior can change between minor versions; the reusable workflow is the supported interface.
+**Pattern (language-agnostic, OSV database, for a stack pip-audit/npm audit don't cover):** call the reusable workflows this project publishes for exactly this purpose, not its underlying action directly. The action's own `action.yml` says plainly it isn't meant for direct use, since its behavior can change between minor versions; the reusable workflow is the supported interface.
 
 ```yaml
 # .github/workflows/osv-scanner.yml
@@ -219,33 +183,17 @@ jobs:
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67  # v2.5.1
 ```
 
-Pinned to a commit SHA like every other `uses:` (§1), including a reusable workflow: a tag can be
-moved, a SHA cannot. Use the SHA of whatever the project's current release is when you adopt this
-(check its own releases page), and keep it fresh via Dependabot's `github-actions` ecosystem
-(§4). `security-events: write` sits on the two jobs that upload SARIF, not at the top of the file,
-so nothing else in the workflow inherits it. A reusable workflow can only be granted what the
-caller allows, and this one declares `actions: read` as well, so a caller that grants less fails
-at startup with no log (`startup_failure`), not with a permissions error.
+Pinned to a commit SHA like every other `uses:` (§1), including a reusable workflow: a tag can be moved, a SHA cannot. Use the SHA of whatever the project's current release is when you adopt this (check its own releases page), and keep it fresh via Dependabot's `github-actions` ecosystem (§4). `security-events: write` sits on the two jobs that upload SARIF, not at the top of the file, so nothing else in the workflow inherits it. A reusable workflow can only be granted what the caller allows, and this one declares `actions: read` as well, so a caller that grants less fails at startup with no log (`startup_failure`), not with a permissions error.
 
-**Avoiding the "permanently red" failure mode:** a real known-unfixable transitive CVE (no patched
-version published yet) will otherwise block every unrelated PR indefinitely, which is exactly how
-a check like this gets ignored or disabled. Start report-only (`continue-on-error: true`, or
-`npm audit` without `--audit-level` gating the job's exit code) for the first few weeks on an
-existing repo with an unaudited dependency tree, resolve or explicitly accept whatever the first
-run finds, then flip to blocking. On a brand-new repo with a clean tree, blocking from day one is
-fine, there's nothing yet to triage.
+**Avoiding the "permanently red" failure mode:** a real known-unfixable transitive CVE (no patched version published yet) will otherwise block every unrelated PR indefinitely, which is exactly how a check like this gets ignored or disabled. Start report-only (`continue-on-error: true`, or `npm audit` without `--audit-level` gating the job's exit code) for the first few weeks on an existing repo with an unaudited dependency tree, resolve or explicitly accept whatever the first run finds, then flip to blocking. On a brand-new repo with a clean tree, blocking from day one is fine, there's nothing yet to triage.
 
 ---
 
 ## 4. Dependabot (one file, every ecosystem)
 
-**Why:** dependency and Action-pin freshness across every ecosystem a repo touches, without a human
-babysitting each one individually.
+**Why:** dependency and Action-pin freshness across every ecosystem a repo touches, without a human babysitting each one individually.
 
-**When to use it:** every tier needs at least the `github-actions` entry (see §1) plus whatever
-language ecosystem the repo uses. The `docker` ecosystem applies once the repo ships a container
-image (Tier 2+ typically). The *second* `docker` entry below (for a deploy/compose directory) is
-specifically for Tier 2+ projects that ship more than their own Dockerfile.
+**When to use it:** every tier needs at least the `github-actions` entry (see §1) plus whatever language ecosystem the repo uses. The `docker` ecosystem applies once the repo ships a container image (Tier 2+ typically). The *second* `docker` entry below (for a deploy/compose directory) is specifically for Tier 2+ projects that ship more than their own Dockerfile.
 
 ```yaml
 # .github/dependabot.yml
@@ -309,30 +257,19 @@ updates:
       default-days: 7
 ```
 
-Only include the ecosystem blocks a repo actually uses. A Tier 1 CLI with no Docker image and no
-npm dependencies needs `github-actions` and `pip` and nothing else.
+Only include the ecosystem blocks a repo actually uses. A Tier 1 CLI with no Docker image and no npm dependencies needs `github-actions` and `pip` and nothing else.
 
-**Every entry carries a `cooldown`.** A version published minutes ago is the version most likely
-to be a compromised release that gets pulled within days. `cooldown` makes Dependabot wait before
-proposing it, and security updates ignore it, so a real fix is not delayed. `zizmor` reports an
-entry without one (`dependabot-cooldown`), which is why it is in every block above.
+**Every entry carries a `cooldown`.** A version published minutes ago is the version most likely to be a compromised release that gets pulled within days. `cooldown` makes Dependabot wait before proposing it, and security updates ignore it, so a real fix is not delayed. `zizmor` reports an entry without one (`dependabot-cooldown`), which is why it is in every block above.
 
-**Shared lockfiles:** grouping version updates reduces overlapping PRs that edit the same files.
-Setting `open-pull-requests-limit: 1` also limits concurrent version-update PRs per ecosystem, but
-can delay unrelated version updates. Security updates have a separate limit and can still
-overlap with version updates. Grouping and limits reduce conflicts, not eliminate them.
+**Shared lockfiles:** grouping version updates reduces overlapping PRs that edit the same files. Setting `open-pull-requests-limit: 1` also limits concurrent version-update PRs per ecosystem, but can delay unrelated version updates. Security updates have a separate limit and can still overlap with version updates. Grouping and limits reduce conflicts, not eliminate them.
 
 ---
 
 ## 5. CodeQL (minimal, correct, least privilege)
 
-**Why:** semantic static analysis that finds real vulnerability patterns (not just style issues),
-with native integration into the GitHub Security tab (SARIF) and no separate account or dashboard
-to manage. Free for public repos.
+**Why:** semantic static analysis that finds real vulnerability patterns (not just style issues), with native integration into the GitHub Security tab (SARIF) and no separate account or dashboard to manage. Free for public repos.
 
-**When to use it:** Tier 2+ as a default; worth enabling on Tier 1 too for any language CodeQL
-supports, since it's essentially maintenance-free once wired up. Skip it only if the repo's whole
-surface is a language CodeQL doesn't support (PHP, for one; see §6 instead).
+**When to use it:** Tier 2+ as a default; worth enabling on Tier 1 too for any language CodeQL supports, since it's essentially maintenance-free once wired up. Skip it only if the repo's whole surface is a language CodeQL doesn't support (PHP, for one; see §6 instead).
 
 ```yaml
 # .github/workflows/codeql.yml
@@ -372,24 +309,15 @@ jobs:
       - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938  # v4.37.9
 ```
 
-For more than one language, use `strategy: matrix: language: [...]` instead of duplicating the job.
-Add `actions` to the list: CodeQL can analyze the workflow files themselves for injection and unsafe
-triggers, and it needs no build step (`build-mode: none`).
-Stagger the weekly `schedule` cron a few hours from Semgrep's and Trivy's own schedules (§6, §8) so
-scans don't all queue at once.
+For more than one language, use `strategy: matrix: language: [...]` instead of duplicating the job. Add `actions` to the list: CodeQL can analyze the workflow files themselves for injection and unsafe triggers, and it needs no build step (`build-mode: none`). Stagger the weekly `schedule` cron a few hours from Semgrep's and Trivy's own schedules (§6, §8) so scans don't all queue at once.
 
 ---
 
 ## 6. Semgrep (SAST for what CodeQL does not cover)
 
-**Why:** CodeQL doesn't support every language you might ship (PHP has no CodeQL support at all),
-and even where both tools apply to the same code, Semgrep's community rule registry (`p/javascript`,
-`p/php`, `p/typescript`, …) is an independently maintained, differently-tuned rule set. Running both
-is not redundant; it's a second reviewer looking for different things.
+**Why:** CodeQL doesn't support every language you might ship (PHP has no CodeQL support at all), and even where both tools apply to the same code, Semgrep's community rule registry (`p/javascript`, `p/php`, `p/typescript`, …) is an independently maintained, differently-tuned rule set. Running both is not redundant; it's a second reviewer looking for different things.
 
-**When to use it:** Tier 2+ generally, as a complement to CodeQL. Essential (not optional) for any
-Tier 1+ repo whose primary language CodeQL doesn't cover. In that case Semgrep is the *only* SAST
-option, not a nice-to-have.
+**When to use it:** Tier 2+ generally, as a complement to CodeQL. Essential (not optional) for any Tier 1+ repo whose primary language CodeQL doesn't cover. In that case Semgrep is the *only* SAST option, not a nice-to-have.
 
 ```yaml
 # .github/workflows/semgrep.yml
@@ -446,32 +374,17 @@ jobs:
           sarif_file: semgrep.sarif
 ```
 
-`--error` fails the scan step on any finding: that's the gate. `upload-sarif` runs on
-`if: always()` so results still reach the Security tab if the scan step failed; `test -f ... ||
-echo ...` guarantees a valid (empty) SARIF file exists even if Semgrep crashed before writing one.
-Swap `p/javascript`/`p/typescript` for the packs matching your stack. Registry configs stack, so
-pass `--config` more than once for a polyglot repo. For a Python project, [section 14](#14-hash-pinned-dependency-lockfile-python-pip-compile)
-covers a stronger alternative to a bare version pin.
+`--error` fails the scan step on any finding: that's the gate. `upload-sarif` runs on `if: always()` so results still reach the Security tab if the scan step failed; `test -f ... || echo ...` guarantees a valid (empty) SARIF file exists even if Semgrep crashed before writing one. Swap `p/javascript`/`p/typescript` for the packs matching your stack. Registry configs stack, so pass `--config` more than once for a polyglot repo. For a Python project, [section 14](#14-hash-pinned-dependency-lockfile-python-pip-compile) covers a stronger alternative to a bare version pin.
 
 ---
 
 ## 7. gitleaks (CI secret scanning, not a replacement for platform scanning)
 
-**Why:** catches secrets already committed to the working tree or history (API keys, private keys,
-database URLs with embedded credentials) that a human skimming a diff can miss, especially in
-generated files or a large diff.
+**Why:** catches secrets already committed to the working tree or history (API keys, private keys, database URLs with embedded credentials) that a human skimming a diff can miss, especially in generated files or a large diff.
 
-**When to use it:** all tiers, including Tier 1. This costs seconds of CI time and catches an
-entire class of "we shipped a live credential" incident; even a Tier 1 tool with zero external
-users has API keys in its own local environment that a contributor could accidentally commit.
+**When to use it:** all tiers, including Tier 1. This costs seconds of CI time and catches an entire class of "we shipped a live credential" incident; even a Tier 1 tool with zero external users has API keys in its own local environment that a contributor could accidentally commit.
 
-**Pattern (range-scoped, the actual default to use, all tiers):** gitleaks' own default
-`--log-opts` is `git log --all --full-history`, which, combined with a full-history checkout,
-scans *every branch's entire history* on every run. Left at that default, a PR can fail
-`secret-scan` because some unrelated branch has an old flagged commit, regardless of what the PR
-itself changed, which is exactly the kind of false positive that trains people to ignore or
-disable the check. Scope the scan to the commits a run actually introduces from the start, don't
-defer this:
+**Pattern (range-scoped, the actual default to use, all tiers):** gitleaks' own default `--log-opts` is `git log --all --full-history`, which, combined with a full-history checkout, scans *every branch's entire history* on every run. Left at that default, a PR can fail `secret-scan` because some unrelated branch has an old flagged commit, regardless of what the PR itself changed, which is exactly the kind of false positive that trains people to ignore or disable the check. Scope the scan to the commits a run actually introduces from the start, don't defer this:
 
 ```yaml
 # .github/workflows/ci.yml (excerpt)
@@ -525,20 +438,11 @@ jobs:
 
 Two details in this recipe are deliberate, and both were wrong in earlier versions of it:
 
-- **Context values reach the shell through `env:`, never through `${{ }}` inside `run:`.** An
-  expression inside a `run:` block is substituted into the script text before the shell parses it,
-  so a value an outsider can influence (a branch name, a PR title) becomes code. Passed as an
-  environment variable, it is only ever data. `zizmor` flags the old form as high severity
-  (`template-injection`), and §15 wires it into CI.
+- **Context values reach the shell through `env:`, never through `${{ }}` inside `run:`.** An expression inside a `run:` block is substituted into the script text before the shell parses it, so a value an outsider can influence (a branch name, a PR title) becomes code. Passed as an environment variable, it is only ever data. `zizmor` flags the old form as high severity (`template-injection`), and §15 wires it into CI.
 - **The download is HTTPS-only** (`--proto '=https' --tlsv1.2`), so a redirect cannot downgrade it.
-- **The downloaded binary is verified against a checksum before it runs.** An unverified `curl`
-  of an executable into a CI job is the kind of unpinned dependency OpenSSF Scorecard's
-  Pinned-Dependencies check reports. Take the hash from the release's own checksums file.
+- **The downloaded binary is verified against a checksum before it runs.** An unverified `curl` of an executable into a CI job is the kind of unpinned dependency OpenSSF Scorecard's Pinned-Dependencies check reports. Take the hash from the release's own checksums file.
 
-**Faster to wire up, but carries a known false-positive mode: the action-based minimal
-pattern.** If the range-scoped version above is more setup than a given moment allows, this
-one-step version is a legitimate starting point, but treat the upgrade above as immediate
-follow-up work, not a someday-Tier-2 nice-to-have:
+**Faster to wire up, but carries a known false-positive mode: the action-based minimal pattern.** If the range-scoped version above is more setup than a given moment allows, this one-step version is a legitimate starting point, but treat the upgrade above as immediate follow-up work, not a someday-Tier-2 nice-to-have:
 
 ```yaml
       - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # v3.0.0
@@ -547,21 +451,12 @@ follow-up work, not a someday-Tier-2 nice-to-have:
           GITLEAKS_ENABLE_COMMENTS: false
 ```
 
-(`GITLEAKS_ENABLE_COMMENTS: false` skips posting PR comments so the job doesn't need
-`pull-requests: write` on top of `contents: read`. A `GITLEAKS_LICENSE` secret is only required for
-GitHub *organization*-owned repos, not personal-account repos.)
+(`GITLEAKS_ENABLE_COMMENTS: false` skips posting PR comments so the job doesn't need `pull-requests: write` on top of `contents: read`. A `GITLEAKS_LICENSE` secret is only required for GitHub *organization*-owned repos, not personal-account repos.)
 
-**Complement, not replacement:** also turn on GitHub's own **Settings → Code security → Secret
-scanning** and **Push protection**, on every repo, public or private (both free for public repos;
-private repos need GitHub Advanced Security on non-Enterprise plans). They catch different things
-for different reasons:
+**Complement, not replacement:** also turn on GitHub's own **Settings → Code security → Secret scanning** and **Push protection**, on every repo, public or private (both free for public repos; private repos need GitHub Advanced Security on non-Enterprise plans). They catch different things for different reasons:
 
-- **Secret scanning + push protection** runs server-side, at push time, against provider-partnered
-  token formats (AWS, Stripe, GitHub tokens, etc.). Push protection actually *blocks* the push
-  before the secret lands in the repo. No CI step running after the push can do that.
-- **gitleaks** runs in CI, after the push, against a configurable regex/entropy ruleset. It catches
-  bespoke or internal secret formats outside GitHub's partner list, and it backstops a contributor
-  working from a fork or a machine where push protection was bypassed some other way.
+- **Secret scanning + push protection** runs server-side, at push time, against provider-partnered token formats (AWS, Stripe, GitHub tokens, etc.). Push protection actually *blocks* the push before the secret lands in the repo. No CI step running after the push can do that.
+- **gitleaks** runs in CI, after the push, against a configurable regex/entropy ruleset. It catches bespoke or internal secret formats outside GitHub's partner list, and it backstops a contributor working from a fork or a machine where push protection was bypassed some other way.
 
 Run both. Neither is a superset of the other.
 
@@ -569,16 +464,11 @@ Run both. Neither is a superset of the other.
 
 ## 8. Trivy (scan the artifact that actually ships)
 
-**Why:** "scan what you ship" is the entire point. Scanning a throwaway image built with different
-base-layer digests, different build args, or a different Dockerfile than what actually gets pushed
-to the registry tells you nothing about what your users will pull.
+**Why:** "scan what you ship" is the entire point. Scanning a throwaway image built with different base-layer digests, different build args, or a different Dockerfile than what actually gets pushed to the registry tells you nothing about what your users will pull.
 
-**When to use it:** Tier 2+: any project that publishes a container image other people or systems
-pull. Skip it for a Tier 1 tool that never publishes an image, or publishes one nobody else uses;
-add it the moment that stops being true.
+**When to use it:** Tier 2+: any project that publishes a container image other people or systems pull. Skip it for a Tier 1 tool that never publishes an image, or publishes one nobody else uses; add it the moment that stops being true.
 
-**Pattern:** build the image once with `push: false, load: true`, tag it something like `:ci-scan`,
-scan that exact image, gate on CRITICAL, and only if the gate passes, push.
+**Pattern:** build the image once with `push: false, load: true`, tag it something like `:ci-scan`, scan that exact image, gate on CRITICAL, and only if the gate passes, push.
 
 ```yaml
       - name: Build image for scanning
@@ -630,32 +520,17 @@ scan that exact image, gate on CRITICAL, and only if the gate passes, push.
           cache-to: type=gha,mode=max
 ```
 
-The "Push image" step rebuilds rather than re-tagging the already-scanned local image. That's safe
-*only* because `cache-from`/`cache-to` (BuildKit's GitHub Actions cache) makes the second build
-content-identical and near-instant, not a fresh build from a possibly-different upstream state. If
-the Dockerfile does anything non-deterministic at build time (e.g. `apt-get upgrade` with no pin),
-don't rely on this: build once per platform, push by digest, and compose the final manifest with
-`docker buildx imagetools create` from those digests instead of ever rebuilding (the Tier 3
-multi-arch pattern).
+The "Push image" step rebuilds rather than re-tagging the already-scanned local image. That's safe *only* because `cache-from`/`cache-to` (BuildKit's GitHub Actions cache) makes the second build content-identical and near-instant, not a fresh build from a possibly-different upstream state. If the Dockerfile does anything non-deterministic at build time (e.g. `apt-get upgrade` with no pin), don't rely on this: build once per platform, push by digest, and compose the final manifest with `docker buildx imagetools create` from those digests instead of ever rebuilding (the Tier 3 multi-arch pattern).
 
-**Also worth adding (Tier 2+):** a weekly scheduled re-scan of the actual *published* `:latest`
-image: `docker pull` and re-tag it to `:ci-scan` on a `schedule` trigger rather than rebuilding, so
-the same "Trivy scan" step above runs against it. Rebuilding on a schedule would silently re-apply
-today's patched OS packages via the Dockerfile's own install step, defeating the point of checking
-what's actually deployed. This is the only way to learn about a CVE disclosed in a base image
-weeks after the last release, without a human remembering to re-trigger anything.
+**Also worth adding (Tier 2+):** a weekly scheduled re-scan of the actual *published* `:latest` image: `docker pull` and re-tag it to `:ci-scan` on a `schedule` trigger rather than rebuilding, so the same "Trivy scan" step above runs against it. Rebuilding on a schedule would silently re-apply today's patched OS packages via the Dockerfile's own install step, defeating the point of checking what's actually deployed. This is the only way to learn about a CVE disclosed in a base image weeks after the last release, without a human remembering to re-trigger anything.
 
 ---
 
 ## 9. Codecov (a real signal, not yet a gate)
 
-**Why:** coverage alone doesn't prove correctness, but a coverage regression on a PR's diff ("patch
-coverage") is a fast, near-zero-effort signal that new code shipped with no test around it. Worth
-surfacing on every PR even before anyone decides to enforce it.
+**Why:** coverage alone doesn't prove correctness, but a coverage regression on a PR's diff ("patch coverage") is a fast, near-zero-effort signal that new code shipped with no test around it. Worth surfacing on every PR even before anyone decides to enforce it.
 
-**When to use it:** Tier 2+, or any repo whose test suite already emits a coverage report. Wire it
-up at the same time as the test job, not as a separate later initiative. The cost is a few extra
-lines once `pytest --cov`/`vitest --coverage`/equivalent is already producing a report.
+**When to use it:** Tier 2+, or any repo whose test suite already emits a coverage report. Wire it up at the same time as the test job, not as a separate later initiative. The cost is a few extra lines once `pytest --cov`/`vitest --coverage`/equivalent is already producing a report.
 
 **Wiring:**
 
@@ -690,15 +565,9 @@ lines once `pytest --cov`/`vitest --coverage`/equivalent is already producing a 
           fail_ci_if_error: false
 ```
 
-A step's own `env:` block is evaluated before that same step's `if:` condition, so checking
-`env.CODECOV_TOKEN` inside the same step's `if:` is a valid, working way to skip cleanly on fork PRs
-without a separate job-level `env:` block (the same pattern is used for `SONAR_TOKEN` in §10).
-The action runs separately for coverage and test results. `report_type: test_results` sends the
-JUnit report to Test Analytics, not to coverage. The test-results upload remains non-blocking on
-an upload error; the coverage upload fails CI on an upload error.
+A step's own `env:` block is evaluated before that same step's `if:` condition, so checking `env.CODECOV_TOKEN` inside the same step's `if:` is a valid, working way to skip cleanly on fork PRs without a separate job-level `env:` block (the same pattern is used for `SONAR_TOKEN` in §10). The action runs separately for coverage and test results. `report_type: test_results` sends the JUnit report to Test Analytics, not to coverage. The test-results upload remains non-blocking on an upload error; the coverage upload fails CI on an upload error.
 
-4. Add a `codecov.yml` at the repo root to make thresholds explicit instead of relying on Codecov's
-   undocumented defaults:
+4. Add a `codecov.yml` at the repo root to make thresholds explicit instead of relying on Codecov's undocumented defaults:
 
 ```yaml
 # codecov.yml
@@ -719,51 +588,23 @@ comment:
   require_changes: false
 ```
 
-**Not a merge gate by default.** As soon as this is wired up, `codecov/project` and `codecov/patch`
-appear as commit statuses on every PR (genuinely useful), but nothing about adding this file makes
-a red status block a merge. That's a separate, deliberate decision: **Settings → Branches → Branch
-protection rule → Require status checks to pass → add `codecov/project` and/or `codecov/patch`.** Do
-this only after seeing real numbers for a while and confirming the threshold isn't a surprise wall
-on the next ordinary PR.
+**Not a merge gate by default.** As soon as this is wired up, `codecov/project` and `codecov/patch` appear as commit statuses on every PR (genuinely useful), but nothing about adding this file makes a red status block a merge. That's a separate, deliberate decision: **Settings → Branches → Branch protection rule → Require status checks to pass → add `codecov/project` and/or `codecov/patch`.** Do this only after seeing real numbers for a while and confirming the threshold isn't a surprise wall on the next ordinary PR.
 
 ---
 
 ## 10. SonarCloud (Automatic Analysis vs CI-based analysis)
 
-This is the most nuanced tool in this cookbook: SonarCloud ships two mutually exclusive analysis
-modes, and the default one silently cannot do the thing most people set it up for.
+This is the most nuanced tool in this cookbook: SonarCloud ships two mutually exclusive analysis modes, and the default one silently cannot do the thing most people set it up for.
 
-**The sourced finding (from SonarSource's own documentation, not inferred):** Automatic Analysis
-has coverage support removed at the product level. SonarSource's own docs state it plainly:
-*"Currently, automatic analysis has the following limitations: … Code coverage information is not
-supported"*. That holds under any configuration, for any language. Coverage only works under
-**CI-based analysis**: a `sonar-scanner`/`sonarqube-scan-action` step running in your own CI,
-authenticated with `SONAR_TOKEN`, reading `sonar-project.properties`. The two modes also actively
-conflict if both are left on: SonarSource's docs state that enabling Automatic Analysis while a
-CI-based analysis is configured makes the CI-based analysis fail. Migrating is not "add a CI step."
-It's "turn Automatic Analysis off, *then* add a CI step." A repo that ran Automatic Analysis since
-import (the default on first add) and only later wired up real coverage-generating tests can have a
-fully green dashboard with a coverage-based quality-gate condition (e.g. "new code coverage < 80%
-fails the gate") that has silently never fired even once, not because coverage is good, but because
-there's no coverage number to evaluate it against.
+**The sourced finding (from SonarSource's own documentation, not inferred):** Automatic Analysis has coverage support removed at the product level. SonarSource's own docs state it plainly: *"Currently, automatic analysis has the following limitations: … Code coverage information is not supported"*. That holds under any configuration, for any language. Coverage only works under **CI-based analysis**: a `sonar-scanner`/`sonarqube-scan-action` step running in your own CI, authenticated with `SONAR_TOKEN`, reading `sonar-project.properties`. The two modes also actively conflict if both are left on: SonarSource's docs state that enabling Automatic Analysis while a CI-based analysis is configured makes the CI-based analysis fail. Migrating is not "add a CI step." It's "turn Automatic Analysis off, *then* add a CI step." A repo that ran Automatic Analysis since import (the default on first add) and only later wired up real coverage-generating tests can have a fully green dashboard with a coverage-based quality-gate condition (e.g. "new code coverage < 80% fails the gate") that has silently never fired even once, not because coverage is good, but because there's no coverage number to evaluate it against.
 
-**When to use it:** Tier 2+, and specifically only once the repo already has a coverage-generating
-test suite wired to something (even just Codecov, §9). SonarCloud's main incremental value over
-Codecov alone is combining coverage with code-smell/duplication/maintainability analysis under one
-quality gate. For Tier 1, Codecov alone is the faster, lower-setup-cost path to "coverage is visibly
-checked somewhere"; SonarCloud is worth adding for its own sake later, not a starting requirement.
+**When to use it:** Tier 2+, and specifically only once the repo already has a coverage-generating test suite wired to something (even just Codecov, §9). SonarCloud's main incremental value over Codecov alone is combining coverage with code-smell/duplication/maintainability analysis under one quality gate. For Tier 1, Codecov alone is the faster, lower-setup-cost path to "coverage is visibly checked somewhere"; SonarCloud is worth adding for its own sake later, not a starting requirement.
 
-**Exact human steps** (cannot be done by an agent: needs SonarCloud org-admin *and* GitHub
-repo-admin access):
+**Exact human steps** (cannot be done by an agent: needs SonarCloud org-admin *and* GitHub repo-admin access):
 
-1. In SonarCloud, open the project's **Administration → Analysis Method** page and pick the
-   **GitHub Actions** tutorial. The in-product tutorial generates the token for you (a scoped
-   organization token on a Team plan, a personal access token on Free); use the value it shows
-   rather than guessing which token type the plan expects.
-2. In GitHub: **Settings → Secrets and variables → Actions → New repository secret**, named
-   `SONAR_TOKEN`, value from step 1.
-3. On the same SonarCloud **Analysis Method** page, switch **Automatic Analysis** to **off**. Not
-   optional: leaving it on makes the new CI-based analysis step fail on every run.
+1. In SonarCloud, open the project's **Administration → Analysis Method** page and pick the **GitHub Actions** tutorial. The in-product tutorial generates the token for you (a scoped organization token on a Team plan, a personal access token on Free); use the value it shows rather than guessing which token type the plan expects.
+2. In GitHub: **Settings → Secrets and variables → Actions → New repository secret**, named `SONAR_TOKEN`, value from step 1.
+3. On the same SonarCloud **Analysis Method** page, switch **Automatic Analysis** to **off**. Not optional: leaving it on makes the new CI-based analysis step fail on every run.
 
 **`sonar-project.properties`** (repo root):
 
@@ -784,16 +625,9 @@ sonar.python.coverage.reportPaths=coverage.xml
 sonar.python.xunit.reportPath=junit.xml
 ```
 
-If the organization key should not live in the repository, leave `sonar.organization` out of this
-file and pass it from a repository variable instead: set `SONAR_ORGANIZATION` under **Settings →
-Secrets and variables → Actions → Variables**, and give the scan step `args:
--Dsonar.organization=${{ env.SONAR_ORGANIZATION }}` with `SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}`
-in its `env:`. A variable is not a secret, but it is not published with the repository either.
+If the organization key should not live in the repository, leave `sonar.organization` out of this file and pass it from a repository variable instead: set `SONAR_ORGANIZATION` under **Settings → Secrets and variables → Actions → Variables**, and give the scan step `args: -Dsonar.organization=${{ env.SONAR_ORGANIZATION }}` with `SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}` in its `env:`. A variable is not a secret, but it is not published with the repository either.
 
-For a JS/TS project, replace the two `sonar.python.*` lines with
-`sonar.javascript.lcov.reportPaths=path/to/lcov.info` (accepts a comma-separated list for a
-monorepo with several workspaces). `sonar.sources` and `sonar.tests` never accept wildcards, under
-either analysis mode. List real paths, not a glob.
+For a JS/TS project, replace the two `sonar.python.*` lines with `sonar.javascript.lcov.reportPaths=path/to/lcov.info` (accepts a comma-separated list for a monorepo with several workspaces). `sonar.sources` and `sonar.tests` never accept wildcards, under either analysis mode. List real paths, not a glob.
 
 **CI step**, added after the job step(s) that produce the coverage/JUnit reports it reads:
 
@@ -820,23 +654,9 @@ either analysis mode. List real paths, not a glob.
           SONAR_HOST_URL: https://sonarcloud.io
 ```
 
-**Why the guard has to be `if: env.SONAR_TOKEN != ''`, not `if: success()` or nothing at all:**
-fork-originated `pull_request` runs never receive repository secrets: `secrets.SONAR_TOKEN`
-resolves to an empty string, not an error. Unlike Codecov's upload action, `sonarqube-scan-action`
-has no soft-fail option. An empty `SONAR_TOKEN` makes the step error for real, turning every
-external contributor's PR red through no fault of their own. As in §9, the step's own `env:` block
-is evaluated before its `if:`, so this works without a separate job-level `env:` block. The
-trade-off to make deliberately, not by accident: this means fork PRs get *no* SonarCloud analysis.
-Covering them too needs SonarSource's documented three-workflow split (build the fork's code with
-no secrets → hand off via `workflow_run` → analyze with secrets, never executing fork-provided
-code): real added complexity, worth it only if fork contributions are actually common.
+**Why the guard has to be `if: env.SONAR_TOKEN != ''`, not `if: success()` or nothing at all:** fork-originated `pull_request` runs never receive repository secrets: `secrets.SONAR_TOKEN` resolves to an empty string, not an error. Unlike Codecov's upload action, `sonarqube-scan-action` has no soft-fail option. An empty `SONAR_TOKEN` makes the step error for real, turning every external contributor's PR red through no fault of their own. As in §9, the step's own `env:` block is evaluated before its `if:`, so this works without a separate job-level `env:` block. The trade-off to make deliberately, not by accident: this means fork PRs get *no* SonarCloud analysis. Covering them too needs SonarSource's documented three-workflow split (build the fork's code with no secrets → hand off via `workflow_run` → analyze with secrets, never executing fork-provided code): real added complexity, worth it only if fork contributions are actually common.
 
-**A later, deliberate decision, not a default:** add `sonar.qualitygate.wait=true` to
-`sonar-project.properties` once real coverage numbers have been observed and the quality gate's
-coverage condition is confirmed achievable. That flag fails the scan step itself when the quality
-gate fails. That's what makes it safe to add the scan job to `main`'s required status checks
-(**Settings → Branches**). Don't add it on the same PR that turns CI-based analysis on; you don't
-yet know what the gate will say.
+**A later, deliberate decision, not a default:** add `sonar.qualitygate.wait=true` to `sonar-project.properties` once real coverage numbers have been observed and the quality gate's coverage condition is confirmed achievable. That flag fails the scan step itself when the quality gate fails. That's what makes it safe to add the scan job to `main`'s required status checks (**Settings → Branches**). Don't add it on the same PR that turns CI-based analysis on; you don't yet know what the gate will say.
 
 **Verify it actually worked, don't assume:**
 
@@ -844,23 +664,15 @@ yet know what the gate will say.
 curl -s "https://sonarcloud.io/api/measures/component?component=<org>_<repo>&metricKeys=coverage,new_coverage"
 ```
 
-`coverage`/`new_coverage` should be present and non-empty in the response. Under Automatic
-Analysis they're absent from this endpoint's response entirely, not just zero.
+`coverage`/`new_coverage` should be present and non-empty in the response. Under Automatic Analysis they're absent from this endpoint's response entirely, not just zero.
 
 ---
 
 ## 11. SBOM generation on release (CycloneDX)
 
-**Why:** a CycloneDX SBOM is a machine-readable manifest of every package inside the artifact you
-shipped. It's the only way anyone downstream (including your own team, months later) can answer
-"are we affected by CVE-2026-XXXXX" without re-scanning the exact historical image. Increasingly
-also a procurement/compliance ask from security-conscious customers.
+**Why:** a CycloneDX SBOM is a machine-readable manifest of every package inside the artifact you shipped. It's the only way anyone downstream (including your own team, months later) can answer "are we affected by CVE-2026-XXXXX" without re-scanning the exact historical image. Increasingly also a procurement/compliance ask from security-conscious customers.
 
-**When to use it:** Tier 2+ that ships a container image. Generating it is a marginal addition once
-Trivy is already scanning the published artifact (§8); the same tool produces both. Skip it for
-Tier 1: it's added workflow surface (another artifact to store, another format to keep matching the
-real image) for a document nobody downstream is asking for yet; add it the moment either stops
-being true.
+**When to use it:** Tier 2+ that ships a container image. Generating it is a marginal addition once Trivy is already scanning the published artifact (§8); the same tool produces both. Skip it for Tier 1: it's added workflow surface (another artifact to store, another format to keep matching the real image) for a document nobody downstream is asking for yet; add it the moment either stops being true.
 
 **Pattern:** reuse the exact image already scanned and gated in §8, never a separately built one:
 
@@ -893,36 +705,21 @@ being true.
           gh release upload "$TAG" sbom.cdx.json --clobber
 ```
 
-For a Tier 3 project already doing a multi-arch, push-by-digest publish, generate one SBOM per
-platform (suffix the artifact/file name accordingly) and attach both to the same release, alongside
-a build provenance attestation (`actions/attest-build-provenance`). Genuinely worth the extra step
-once the publish pipeline is already this sophisticated, not a starting requirement.
+For a Tier 3 project already doing a multi-arch, push-by-digest publish, generate one SBOM per platform (suffix the artifact/file name accordingly) and attach both to the same release, alongside a build provenance attestation (`actions/attest-build-provenance`). Genuinely worth the extra step once the publish pipeline is already this sophisticated, not a starting requirement.
 
 ---
 
 ## 12. Docs as source of truth, and catching stale docs at PR time
 
-**The problem this solves:** a wiki, a security policy, or a controls table drifts from reality
-the moment the thing it describes changes and nobody remembers to update the doc in the same PR.
-This is not a hypothetical: a real audit of a Tier 3 repo following this exact pattern found its
-own `SECURITY.md` undercounting its required CI checks by two, an architecture doc contradicting
-itself about whether a feature had shipped, and a worked example describing a bug that had
-already been fixed, days to weeks earlier in each case. None of that was caught automatically,
-because nothing was checking.
+**The problem this solves:** a wiki, a security policy, or a controls table drifts from reality the moment the thing it describes changes and nobody remembers to update the doc in the same PR. This is not a hypothetical: a real audit of a Tier 3 repo following this exact pattern found its own `SECURITY.md` undercounting its required CI checks by two, an architecture doc contradicting itself about whether a feature had shipped, and a worked example describing a bug that had already been fixed, days to weeks earlier in each case. None of that was caught automatically, because nothing was checking.
 
-**When to use it:** the wiki-sync half (below) applies once a repo has a GitHub Wiki (Tier 3, see
-[tiers.md](tiers.md#tier-3-flagship)). The PR-time declaration check (further below) is worth
-adopting from Tier 2 up, even for a repo with no Wiki at all, since it works for any doc a PR
-might need to touch.
+**When to use it:** the wiki-sync half (below) applies once a repo has a GitHub Wiki (Tier 3, see [tiers.md](tiers.md#tier-3-flagship)). The PR-time declaration check (further below) is worth adopting from Tier 2 up, even for a repo with no Wiki at all, since it works for any doc a PR might need to touch.
 
 ### a) If the repo has a Wiki: the Wiki is a build output, not a source
 
-Never edit a GitHub Wiki page directly in its own web UI once this pattern is in place. A direct
-edit is invisible to the repo's history, isn't reviewed, and gets silently overwritten by the
-next sync from the real source.
+Never edit a GitHub Wiki page directly in its own web UI once this pattern is in place. A direct edit is invisible to the repo's history, isn't reviewed, and gets silently overwritten by the next sync from the real source.
 
-Keep the actual content in the repository, for example `docs/wiki/`, and sync it to the GitHub
-Wiki with a workflow that runs on every push to the default branch that touches that directory:
+Keep the actual content in the repository, for example `docs/wiki/`, and sync it to the GitHub Wiki with a workflow that runs on every push to the default branch that touches that directory:
 
 ```yaml
 # .github/workflows/publish-wiki.yml
@@ -973,32 +770,20 @@ jobs:
           git -C "$wiki_publish_dir" push origin HEAD:master
 ```
 
-`github.token` (the default `GITHUB_TOKEN`) is enough here: pushing to a repo's own Wiki only
-needs `contents: write` on the parent repo, the same permission this job already declares. No
-extra secret to create or rotate.
+`github.token` (the default `GITHUB_TOKEN`) is enough here: pushing to a repo's own Wiki only needs `contents: write` on the parent repo, the same permission this job already declares. No extra secret to create or rotate.
 
-**"Validate Wiki source" is a script you write for your own repo, not something to copy
-verbatim.** The point is structural checks that catch drift automatically, not any particular
-rule set. A reasonable starting menu, all cheap to implement in a few dozen lines of plain
-Node/Python with no dependencies:
+**"Validate Wiki source" is a script you write for your own repo, not something to copy verbatim.** The point is structural checks that catch drift automatically, not any particular rule set. A reasonable starting menu, all cheap to implement in a few dozen lines of plain Node/Python with no dependencies:
 
-- Every page your docs are supposed to have actually exists (a fixed list of expected filenames,
-  or every page linked from an index/sidebar page actually resolves).
-- Every internal link (`[text](Some-Page)`, an image reference) resolves to a real file inside
-  the docs directory; nothing links outside it or to a page that no longer exists.
-- A required metadata line is present and well-formed if your docs use one, for example a byline
-  stating who a page is for and when it was last verified against the product.
-- No real email address or other non-synthetic personal data leaked into example content (a
-  cheap, high-value anonymization check that pays for itself the first time it fires).
+- Every page your docs are supposed to have actually exists (a fixed list of expected filenames, or every page linked from an index/sidebar page actually resolves).
+- Every internal link (`[text](Some-Page)`, an image reference) resolves to a real file inside the docs directory; nothing links outside it or to a page that no longer exists.
+- A required metadata line is present and well-formed if your docs use one, for example a byline stating who a page is for and when it was last verified against the product.
+- No real email address or other non-synthetic personal data leaked into example content (a cheap, high-value anonymization check that pays for itself the first time it fires).
 
-Run this same script both in `publish-wiki.yml` (so a broken sync never reaches the live Wiki)
-and as a required PR check whenever `docs/wiki/**` changes, so the structural problems above are
-caught before merge, not after publish.
+Run this same script both in `publish-wiki.yml` (so a broken sync never reaches the live Wiki) and as a required PR check whenever `docs/wiki/**` changes, so the structural problems above are caught before merge, not after publish.
 
 ### b) Any tier with real docs: declare and verify documentation impact per PR
 
-This doesn't need a Wiki. It needs a PR template section and one script, and it catches the more
-common failure: a PR changes something that should update a doc, and nobody remembers.
+This doesn't need a Wiki. It needs a PR template section and one script, and it catches the more common failure: a PR changes something that should update a doc, and nobody remembers.
 
 Add a required section to `pull_request_template.md`:
 
@@ -1010,8 +795,7 @@ Add a required section to `pull_request_template.md`:
 - [ ] No doc update needed: <state the reason>
 ```
 
-Then verify, in CI, that the declaration is actually consistent with the diff instead of trusting
-it on its word:
+Then verify, in CI, that the declaration is actually consistent with the diff instead of trusting it on its word:
 
 ```yaml
 # .github/workflows/docs-impact.yml
@@ -1044,11 +828,7 @@ jobs:
         run: node scripts/check-pr-docs-impact.mjs
 ```
 
-The `edited` trigger is the point of running this as its own workflow. The declaration lives in the
-pull request description, and a plain `pull_request` trigger only runs on opened, synchronize, and
-reopened, so a contributor who corrects the checkbox would still see a failing check until they
-push another commit. `fetch-depth: 0` is needed because the script diffs the pull request's base
-and head commits.
+The `edited` trigger is the point of running this as its own workflow. The declaration lives in the pull request description, and a plain `pull_request` trigger only runs on opened, synchronize, and reopened, so a contributor who corrects the checkbox would still see a failing check until they push another commit. `fetch-depth: 0` is needed because the script diffs the pull request's base and head commits.
 
 ```javascript
 // scripts/check-pr-docs-impact.mjs
@@ -1098,44 +878,21 @@ if (noDocsUpdate && docsChanged) {
 console.log("Documentation impact declaration is consistent with the diff.");
 ```
 
-This needs no extra token or secret: `pull_request.base.sha`/`head.sha` come from the event
-payload GitHub already provides, and diffing the two only needs the checkout already present in
-the job. Widen `DOCS_PATHS` to whatever this repo actually treats as documentation. A `SECURITY.md`
-that lists specific job names as required checks is exactly the kind of file worth including: a
-PR that renames or removes one of those jobs should be forced to say, in its own words, whether
-`SECURITY.md` needs a matching update.
+This needs no extra token or secret: `pull_request.base.sha`/`head.sha` come from the event payload GitHub already provides, and diffing the two only needs the checkout already present in the job. Widen `DOCS_PATHS` to whatever this repo actually treats as documentation. A `SECURITY.md` that lists specific job names as required checks is exactly the kind of file worth including: a PR that renames or removes one of those jobs should be forced to say, in its own words, whether `SECURITY.md` needs a matching update.
 
-**What this pattern cannot do, and why:** it cannot verify that `SECURITY.md`'s claimed required
-status checks still match what branch protection actually enforces in repo settings. Reading
-branch protection (`GET /repos/{owner}/{repo}/branches/{branch}/protection`) needs a token with
-administrative access to the repository, and `administration` is not one of the scopes a
-workflow's `permissions:` block can grant to the default `GITHUB_TOKEN` (verified against
-GitHub's own documented list of workflow permission scopes: it is not in it). The check above
-verifies internal consistency (does the PR's own claim match its own diff); it cannot verify
-external consistency (does the doc match a live setting that lives outside any file in the repo).
+**What this pattern cannot do, and why:** it cannot verify that `SECURITY.md`'s claimed required status checks still match what branch protection actually enforces in repo settings. Reading branch protection (`GET /repos/{owner}/{repo}/branches/{branch}/protection`) needs a token with administrative access to the repository, and `administration` is not one of the scopes a workflow's `permissions:` block can grant to the default `GITHUB_TOKEN` (verified against GitHub's own documented list of workflow permission scopes: it is not in it). The check above verifies internal consistency (does the PR's own claim match its own diff); it cannot verify external consistency (does the doc match a live setting that lives outside any file in the repo).
 
-Closing that second gap needs a GitHub App installation token or fine-grained personal access
-token with repository Administration: read, deliberately kept out of the pull-request-triggered path (a
-privileged token has no business being reachable from a workflow anyone can trigger by opening a
-PR). The proportionate way to use one: a separate, scheduled workflow, `workflow_dispatch` plus a
-weekly `schedule`, that fetches the live required-checks list with that token and fails loudly
-(or opens/updates a tracking issue) if it no longer matches what `SECURITY.md` claims. That is a
-drift detector, not a merge gate, and Tier 3 is the tier where the added setup and the ongoing
-custody of an admin-scoped secret are worth it.
+Closing that second gap needs a GitHub App installation token or fine-grained personal access token with repository Administration: read, deliberately kept out of the pull-request-triggered path (a privileged token has no business being reachable from a workflow anyone can trigger by opening a PR). The proportionate way to use one: a separate, scheduled workflow, `workflow_dispatch` plus a weekly `schedule`, that fetches the live required-checks list with that token and fails loudly (or opens/updates a tracking issue) if it no longer matches what `SECURITY.md` claims. That is a drift detector, not a merge gate, and Tier 3 is the tier where the added setup and the ongoing custody of an admin-scoped secret are worth it.
 
 ---
 
 ## 13. Verifying a repo against this standard automatically
 
-Call the reusable workflow to run the automated subset of [the tier checklist](tiers.md#at-a-glance)
-without maintaining your own copy of the verifier. It checks files and patterns, not full compliance.
+Call the reusable workflow to run the automated subset of [the tier checklist](tiers.md#at-a-glance) without maintaining your own copy of the verifier. It checks files and patterns, not full compliance.
 
-**When to use it:** any tier, after adoption and adding the [repository-standard pointer](../AGENTS.md#if-you-were-sent-here-from-another-repository).
-Use report-only first if unsure what an unassessed repository will report; require the check once you trust its output.
+**When to use it:** any tier, after adoption and adding the [repository-standard pointer](../AGENTS.md#if-you-were-sent-here-from-another-repository). Use report-only first if unsure what an unassessed repository will report; require the check once you trust its output.
 
-The behavior below describes the workflow in this checkout. Before copying the example, select a
-published release that includes these changes and review its release notes. Older releases do not
-necessarily provide the same source identity, runtime, or outputs.
+The behavior below describes the workflow in this checkout. Before copying the example, select a published release that includes these changes and review its release notes. Older releases do not necessarily provide the same source identity, runtime, or outputs.
 
 ```yaml
 # .github/workflows/verify-standard.yml
@@ -1154,26 +911,13 @@ jobs:
     uses: solarssk/playbook/.github/workflows/verify-tier.yml@<commit-sha>  # <release-version>
 ```
 
-Pin the call to a full commit SHA with an exact version comment (§1), never a floating tag or `@main`.
-That keeps changes reviewable; Dependabot's `github-actions` ecosystem (§4) proposes pin and comment updates.
-Find release SHAs with `git ls-remote --tags https://github.com/solarssk/playbook`.
-For annotated tags, use the peeled commit SHA on `refs/tags/<version>^{}`, not the tag-object SHA.
-A lightweight tag has only the `refs/tags/<version>` line.
+Pin the call to a full commit SHA with an exact version comment (§1), never a floating tag or `@main`. That keeps changes reviewable; Dependabot's `github-actions` ecosystem (§4) proposes pin and comment updates. Find release SHAs with `git ls-remote --tags https://github.com/solarssk/playbook`. For annotated tags, use the peeled commit SHA on `refs/tags/<version>^{}`, not the tag-object SHA. A lightweight tag has only the `refs/tags/<version>` line.
 
-In this checkout, the called workflow checks out the same commit that defines its job, using
-the validated `job.workflow_sha` and `job.workflow_repository` fields. `PLAYBOOK_RELEASE` is
-only the notification baseline. It is not a checkout ref. This requires GitHub.com; GHES is
-not supported. See [source identity and platforms](compatibility.md#source-identity-and-platforms).
+In this checkout, the called workflow checks out the same commit that defines its job, using the validated `job.workflow_sha` and `job.workflow_repository` fields. `PLAYBOOK_RELEASE` is only the notification baseline. It is not a checkout ref. This requires GitHub.com; GHES is not supported. See [source identity and platforms](compatibility.md#source-identity-and-platforms).
 
-**`v0.2.0` differs:** it checks out the verifier using `ref: v0.2.0`, runs Node.js 22, and does
-not expose the workflow outputs described below. Its release is not protected by immutable
-releases. Pinning the workflow call to a SHA does not guarantee that its verifier is checked out
-at that same SHA. To obtain that guarantee, upgrade to a published release containing the
-source-identity fix.
+**`v0.2.0` differs:** it checks out the verifier using `ref: v0.2.0`, runs Node.js 22, and does not expose the workflow outputs described below. Its release is not protected by immutable releases. Pinning the workflow call to a SHA does not guarantee that its verifier is checked out at that same SHA. To obtain that guarantee, upgrade to a published release containing the source-identity fix.
 
-Set `permissions: contents: read` explicitly in the caller, even though the callee also declares it.
-Each file needs its own block; without one, the caller uses repository-default token permissions,
-which can be broader than necessary.
+Set `permissions: contents: read` explicitly in the caller, even though the callee also declares it. Each file needs its own block; without one, the caller uses repository-default token permissions, which can be broader than necessary.
 
 Verification has three sources of evidence:
 
@@ -1192,15 +936,9 @@ Tier selection is strict. An explicit numeric `tier` input overrides the automat
 | Declaration format | One digit from `0` to `3`; explanatory text may follow after whitespace |
 | Invalid input or declaration | Fails before checks run |
 
-For live settings, `admin_token` must be a GitHub App installation token or fine-grained PAT with
-repository Administration: read. The default `GITHUB_TOKEN` cannot gain that scope through
-`permissions:` (§12). Without the secret, settings checks explicitly report skipped.
-Classic protection and active applicable Rulesets are combined; empty required-check lists do
-not establish protection, and an unreadable source leaves the assessment incomplete.
+For live settings, `admin_token` must be a GitHub App installation token or fine-grained PAT with repository Administration: read. The default `GITHUB_TOKEN` cannot gain that scope through `permissions:` (§12). Without the secret, settings checks explicitly report skipped. Classic protection and active applicable Rulesets are combined; empty required-check lists do not establish protection, and an unreadable source leaves the assessment incomplete.
 
-**Keep administrative tokens out of PR-triggered workflows.** Inject a short-lived installation
-token or separately stored PAT only in a separate scheduled or manually dispatched settings-check
-workflow with trusted code and inputs. Add `secrets: {admin_token: ...}` only to that trusted caller.
+**Keep administrative tokens out of PR-triggered workflows.** Inject a short-lived installation token or separately stored PAT only in a separate scheduled or manually dispatched settings-check workflow with trusted code and inputs. Add `secrets: {admin_token: ...}` only to that trusted caller.
 
 Update notifications require a GitHub Release per version, not merely a tag:
 
@@ -1209,32 +947,17 @@ Update notifications require a GitHub Release per version, not merely a tag:
 | `playbook-version` warning | Each run compares `PLAYBOOK_RELEASE` with the latest Release; a newer version produces a warning and annotation linking to release notes, never a build failure |
 | Dependabot PR | The `github-actions` ecosystem proposes the SHA bump; confirm release-note inclusion on the first real bump |
 
-Keep the `github-actions` Dependabot entry in every caller. Without it, the workflow warning is
-the only notification; that warning works independently of Dependabot.
-Read the release's **Adopter action** list for changes by tier, then review and bump the pin.
-A release without that list requires no adopter action.
+Keep the `github-actions` Dependabot entry in every caller. Without it, the workflow warning is the only notification; that warning works independently of Dependabot. Read the release's **Adopter action** list for changes by tier, then review and bump the pin. A release without that list requires no adopter action.
 
-The workflow outputs `automated_checks=passed|failed` and `assessment=partial|failed`.
-Exit 0 means no hard check failed, not full tier compliance. Heuristics remain warnings even
-when text matches, and manual requirements stay unassessed. A Tier 3 review must establish
-both coverage and quality gates, their thresholds, and enforcement, not merely a tool name.
-See [verification results](compatibility.md#verification-results) for the exact contract.
+The workflow outputs `automated_checks=passed|failed` and `assessment=partial|failed`. Exit 0 means no hard check failed, not full tier compliance. Heuristics remain warnings even when text matches, and manual requirements stay unassessed. A Tier 3 review must establish both coverage and quality gates, their thresholds, and enforcement, not merely a tool name. See [verification results](compatibility.md#verification-results) for the exact contract.
 
 ---
 
 ## 14. Hash-pinned dependency lockfile (Python: pip-compile)
 
-**Why:** Tier 1 requires dependencies to be "version-pinned in the manifest, not left to float on
-every install." A bare `>=` specifier in `pyproject.toml` satisfies nothing: two builds of the
-same commit, weeks apart, can resolve different exact versions of every dependency and every
-transitive dependency. `pip` has no first-class lockfile the way `npm` or `cargo` does, so the
-manifest itself has to stay loose (an application generally should not upper-bound its own direct
-dependencies) while a separate, generated file pins the exact resolved set, including hashes.
+**Why:** Tier 1 requires dependencies to be "version-pinned in the manifest, not left to float on every install." A bare `>=` specifier in `pyproject.toml` satisfies nothing: two builds of the same commit, weeks apart, can resolve different exact versions of every dependency and every transitive dependency. `pip` has no first-class lockfile the way `npm` or `cargo` does, so the manifest itself has to stay loose (an application generally should not upper-bound its own direct dependencies) while a separate, generated file pins the exact resolved set, including hashes.
 
-**When to use it:** optional at Tier 1, worth adopting once a repo actually publishes an artifact
-(a container image, a package) where "which exact dependency versions shipped" matters, which
-usually means Tier 2. Not required by any tier's checklist; a plain pinned or upper-bounded
-manifest is still a legitimate way to satisfy Tier 1's own item.
+**When to use it:** optional at Tier 1, worth adopting once a repo actually publishes an artifact (a container image, a package) where "which exact dependency versions shipped" matters, which usually means Tier 2. Not required by any tier's checklist; a plain pinned or upper-bounded manifest is still a legitimate way to satisfy Tier 1's own item.
 
 **Generate the lockfile:**
 
@@ -1243,15 +966,7 @@ pip install "pip-tools==7.6.1"
 pip-compile --generate-hashes --allow-unsafe -o requirements.txt pyproject.toml
 ```
 
-Pin `pip-tools` itself to an exact version rather than a floating one for local use, even though
-the manifest's own dev-dependency entry can stay loose: pip-tools has had header-rendering
-differences between versions (for example, whether an unset `--no-index` flag gets echoed into the
-generated file's comment header) that can shift the output in a way unrelated to any real
-dependency change, which breaks the drift check below for the wrong reason. `--generate-hashes`
-records a SHA-256 for every distribution `pip` is allowed to install, so a compromised or
-substituted package on the index fails the install rather than silently landing. `--allow-unsafe`
-includes packages pip-tools otherwise excludes by default (`pip`, `setuptools`, and similar); skip
-it only if none of those appear in the resolved set.
+Pin `pip-tools` itself to an exact version rather than a floating one for local use, even though the manifest's own dev-dependency entry can stay loose: pip-tools has had header-rendering differences between versions (for example, whether an unset `--no-index` flag gets echoed into the generated file's comment header) that can shift the output in a way unrelated to any real dependency change, which breaks the drift check below for the wrong reason. `--generate-hashes` records a SHA-256 for every distribution `pip` is allowed to install, so a compromised or substituted package on the index fails the install rather than silently landing. `--allow-unsafe` includes packages pip-tools otherwise excludes by default (`pip`, `setuptools`, and similar); skip it only if none of those appear in the resolved set.
 
 **Install from it, and drop `pip` afterward:**
 
@@ -1265,14 +980,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip uninstall -y pip
 ```
 
-`--require-hashes` refuses to install anything that isn't hash-pinned in `requirements.txt`,
-turning a missing or stale hash into a build failure instead of a silent gap. The application
-itself installs with `--no-deps`, since its dependencies are already locked; it isn't
-re-resolving anything. Removing `pip` from the final image after install is a small, real
-hardening step for a service that only ever runs via its own entrypoint and never invokes `pip` at
-runtime: `pip` vendors its own copies of packages like `setuptools`, which periodically pick up
-CVEs of their own, unrelated to anything the application actually uses, that a scanner will flag
-in an image that has no way to reach them.
+`--require-hashes` refuses to install anything that isn't hash-pinned in `requirements.txt`, turning a missing or stale hash into a build failure instead of a silent gap. The application itself installs with `--no-deps`, since its dependencies are already locked; it isn't re-resolving anything. Removing `pip` from the final image after install is a small, real hardening step for a service that only ever runs via its own entrypoint and never invokes `pip` at runtime: `pip` vendors its own copies of packages like `setuptools`, which periodically pick up CVEs of their own, unrelated to anything the application actually uses, that a scanner will flag in an image that has no way to reach them.
 
 **Catch drift in CI, don't just trust the committed file:**
 
@@ -1296,35 +1004,20 @@ jobs:
           git diff --exit-code requirements.txt
 ```
 
-This regenerates the lockfile in CI and fails the job if the result differs from what's committed,
-the same shape as the SBOM and Wiki-sync drift checks elsewhere in this document: don't trust that
-a generated file was regenerated, verify it. Set `python-version` here to whatever version the
-image that actually ships is built on, not whatever a repo's other CI jobs happen to use for
-linting or type-checking: `pip-compile` resolves environment-marker-conditional transitive
-dependencies (an `if python_version < "3.13"` clause in some package's own metadata, for example)
-using the interpreter it runs under, so compiling under a different Python version than the
-Dockerfile's base image can reproduce a lockfile that differs from the committed one for a reason
-that has nothing to do with an actual `pyproject.toml` change.
+This regenerates the lockfile in CI and fails the job if the result differs from what's committed, the same shape as the SBOM and Wiki-sync drift checks elsewhere in this document: don't trust that a generated file was regenerated, verify it. Set `python-version` here to whatever version the image that actually ships is built on, not whatever a repo's other CI jobs happen to use for linting or type-checking: `pip-compile` resolves environment-marker-conditional transitive dependencies (an `if python_version < "3.13"` clause in some package's own metadata, for example) using the interpreter it runs under, so compiling under a different Python version than the Dockerfile's base image can reproduce a lockfile that differs from the committed one for a reason that has nothing to do with an actual `pyproject.toml` change.
 
 ---
 
 ## 15. Linting workflows (actionlint and zizmor)
 
-**Why:** workflow files are code that runs with a token and, often, secrets, and almost nothing
-reads them the way a reviewer reads application code. Two linters cover different halves:
+**Why:** workflow files are code that runs with a token and, often, secrets, and almost nothing reads them the way a reviewer reads application code. Two linters cover different halves:
 
-- **actionlint** checks that a workflow is *correct*: valid expressions, real input names, and
-  ShellCheck on every `run:` block.
-- **zizmor** checks that it is *safe*: template injection, unpinned actions, excessive
-  permissions, cache poisoning in release jobs, credential persistence, and Dependabot config
-  without a cooldown.
+- **actionlint** checks that a workflow is *correct*: valid expressions, real input names, and ShellCheck on every `run:` block.
+- **zizmor** checks that it is *safe*: template injection, unpinned actions, excessive permissions, cache poisoning in release jobs, credential persistence, and Dependabot config without a cooldown.
 
-Neither replaces the other. Both are fast, free, and run without secrets. A template injection is
-easy to write and hard to see in review, because the expression looks like ordinary templating,
-while `zizmor` finds it mechanically in seconds.
+Neither replaces the other. Both are fast, free, and run without secrets. A template injection is easy to write and hard to see in review, because the expression looks like ordinary templating, while `zizmor` finds it mechanically in seconds.
 
-**When to use it:** Tier 2 and above, and worth it earlier on any repo whose workflows have grown
-past a single lint job. Start report-only if the first run finds a backlog, then make it blocking.
+**When to use it:** Tier 2 and above, and worth it earlier on any repo whose workflows have grown past a single lint job. Start report-only if the first run finds a backlog, then make it blocking.
 
 ```yaml
 # .github/workflows/ci.yml (excerpt)
@@ -1362,16 +1055,9 @@ jobs:
 
 Notes:
 
-- **Pin zizmor's version** with the `version:` input. The default is `latest`, which is a floating
-  reference inside an otherwise pinned step. `advanced-security: false` keeps the job at
-  `contents: read` (no SARIF upload, so no `security-events: write`); findings appear as
-  annotations instead.
-- **Run it locally first.** `zizmor .` and `actionlint` both run offline against a checkout. Add
-  `GH_TOKEN=$(gh auth token)` to `zizmor` for its online audits.
-- **The docs' own snippets are workflows too.** This repository extracts every complete workflow
-  quoted in its Markdown and runs `actionlint` on it (`scripts/check_doc_snippets.py --extract`), because a
-  snippet that does not parse gets pasted into real repositories anyway.
-- **A finding is a fix, not a suppression.** If a `zizmor: ignore` comment is genuinely needed,
-  put the reason in the same comment.
+- **Pin zizmor's version** with the `version:` input. The default is `latest`, which is a floating reference inside an otherwise pinned step. `advanced-security: false` keeps the job at `contents: read` (no SARIF upload, so no `security-events: write`); findings appear as annotations instead.
+- **Run it locally first.** `zizmor .` and `actionlint` both run offline against a checkout. Add `GH_TOKEN=$(gh auth token)` to `zizmor` for its online audits.
+- **The docs' own snippets are workflows too.** This repository extracts every complete workflow quoted in its Markdown and runs `actionlint` on it (`scripts/check_doc_snippets.py --extract`), because a snippet that does not parse gets pasted into real repositories anyway.
+- **A finding is a fix, not a suppression.** If a `zizmor: ignore` comment is genuinely needed, put the reason in the same comment.
 
 ---
