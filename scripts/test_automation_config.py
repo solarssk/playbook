@@ -104,6 +104,29 @@ def test_dependency_review_covers_all_dependency_scopes():
     }
 
 
+def test_verify_standard_pr_recipe_does_not_pass_secrets():
+    path = ROOT / "docs/ci-cookbook.md"
+    fences = [
+        fence
+        for fence in check_doc_snippets.iter_fences(path.read_text(encoding="utf-8"))
+        if fence.language == "yaml"
+        and any(line == "# .github/workflows/verify-standard.yml" for line in fence.body)
+    ]
+    assert len(fences) == 1
+    workflow = yaml.safe_load("\n".join(fences[0].body))
+    assert "pull_request" in workflow[True]
+    assert "secrets" not in workflow["jobs"]["verify"]
+
+
+def test_verify_tier_pr_usage_example_does_not_pass_secrets():
+    path = ROOT / ".github/workflows/verify-tier.yml"
+    text = path.read_text(encoding="utf-8")
+    usage = text.split("# Usage, in the calling repository's PR workflow:\n", 1)[1]
+    usage = usage.split("# Pass `admin_token`", 1)[0]
+    example = yaml.safe_load("\n".join(line[2:] for line in usage.splitlines() if line.startswith("# ")))
+    assert "secrets" not in example["jobs"]["verify-standard"]
+
+
 @pytest.mark.parametrize(
     ("source", "expected_files"),
     [

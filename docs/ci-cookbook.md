@@ -1159,6 +1159,10 @@ you, from one place, so a change to what the standard requires doesn't mean re-c
 status check once you trust its output; report-only first if you're not sure yet what it will say
 about a repo that's never been checked before.
 
+The behavior below describes the workflow in this checkout. Before copying the example, select a
+published release that includes these changes and review its release notes. Older releases do not
+necessarily provide the same source identity, runtime, or outputs.
+
 ```yaml
 # .github/workflows/verify-standard.yml
 name: Verify standard
@@ -1173,7 +1177,7 @@ permissions:
 
 jobs:
   verify:
-    uses: solarssk/playbook/.github/workflows/verify-tier.yml@<commit-sha>  # v0.2.0
+    uses: solarssk/playbook/.github/workflows/verify-tier.yml@<commit-sha>  # <release-version>
 ```
 
 Pin the reusable workflow call to a commit SHA, not a tag, the same rule as every other `uses:`
@@ -1182,12 +1186,20 @@ what "passing" means in every repo that calls it, with no diff for any of them t
 means you see and choose the bump, and Dependabot's `github-actions` ecosystem (§4) proposes it the
 same way it proposes any other Action version bump, comment included, so the tag stays visible next
 to the SHA. Find the SHA for a given release with `git ls-remote --tags
-https://github.com/solarssk/playbook`.
+https://github.com/solarssk/playbook`. For an annotated tag, use the peeled commit SHA shown on
+the `refs/tags/<version>^{}` line, not the tag-object SHA. A lightweight tag has only the
+`refs/tags/<version>` line.
 
-The called workflow checks out the same commit that defines its job, using the validated
-`job.workflow_sha` and `job.workflow_repository` fields. `PLAYBOOK_RELEASE` is only the
-notification baseline. It is not a checkout ref. This requires GitHub.com; GHES is not
-supported. See [source identity and platforms](compatibility.md#source-identity-and-platforms).
+In this checkout, the called workflow checks out the same commit that defines its job, using
+the validated `job.workflow_sha` and `job.workflow_repository` fields. `PLAYBOOK_RELEASE` is
+only the notification baseline. It is not a checkout ref. This requires GitHub.com; GHES is
+not supported. See [source identity and platforms](compatibility.md#source-identity-and-platforms).
+
+**`v0.2.0` differs:** it checks out the verifier using `ref: v0.2.0`, runs Node.js 22, and does
+not expose the workflow outputs described below. Its release is not protected by immutable
+releases. Pinning the workflow call to a SHA does not guarantee that its verifier is checked out
+at that same SHA. To obtain that guarantee, upgrade to a published release containing the
+source-identity fix.
 
 The `permissions:` block on the calling workflow is not optional either. Without it, this workflow
 runs with the repository's default `GITHUB_TOKEN` permissions, which on most repositories is
@@ -1215,8 +1227,9 @@ These checks are reported as skipped, not silently omitted, if the secret isn't 
 is the same limitation described in §12: `administration` isn't a scope a workflow's own
 `permissions:` block can grant, so there is no way to read these without a token that already has
 that access. Inject a short-lived installation token or a separately stored PAT only in a
-trusted scheduled or manually dispatched settings-check workflow. Add
-`secrets: {admin_token: ...}` to that trusted caller, not to the PR workflow above.
+separate scheduled or manually dispatched settings-check workflow that runs trusted code and
+inputs. Add `secrets: {admin_token: ...}` to that trusted caller, never to a
+pull-request-triggered workflow.
 
 **How a repo finds out the playbook changed.** Pinning to a SHA means nothing updates silently, so
 the notification has to be deliberate. Two mechanisms carry it, and both depend on the playbook
