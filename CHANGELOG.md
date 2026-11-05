@@ -6,6 +6,57 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 
 ## [Unreleased]
 
+### Adopter action
+
+- **All tiers:** use `auto` or one literal digit from `0` to `3` for the verifier tier.
+  Fix malformed `Tier:` declarations. Pin reusable-workflow calls to full commit SHAs.
+  Read warnings, skips, and manual requirements before claiming compliance.
+- **All tiers, if deviating from a requirement:** record the requirement, tier, reason,
+  accountable role, approval, review date, and remediation. A recorded gap is not a pass.
+- **Tier 2 and above:** confirm that every applicable PR gate is actually required,
+  directly or through a tested fail-closed aggregate. Do not require scheduled-only or
+  report-only checks on every PR. Adding a workflow does not update GitHub settings.
+- **Tier 3:** verify both the coverage and code-quality gates, including their thresholds
+  and merge enforcement. A text match for either tool is not sufficient.
+- **Reusable-workflow callers:** the next release uses GitHub.com's called-workflow source
+  context and fails if it is unavailable. GHES is unsupported. Keep administrative read
+  tokens on trusted settings-check paths, not PR paths.
+
+### Added
+
+- Workflow outputs `automated_checks=passed|failed` and `assessment=partial|failed`, plus
+  stable check IDs in the human-readable report. The verifier never certifies full compliance.
+- Effective branch Rulesets support alongside classic protection, including pagination,
+  branch-path encoding, schema validation, and explicit partial-data warnings.
+- A compatibility policy for the standard, automation interfaces, templates, and releases,
+  with a manual deviation record rather than an automated exception engine.
+- A fail-closed `Required CI` aggregate, dependency-coverage regression test, JavaScript
+  and Python static checks, and npm/pip Dependabot coverage for development tools.
+
+### Changed
+
+- Heuristic scanner, workflow, badge-level, and gate checks stay warnings even when text
+  matches. Tier 3 coverage and quality gates are assessed together, not as alternatives.
+- The reusable workflow validates its source repository and SHA before checking out
+  `job.workflow_sha`. Release metadata is no longer an executable checkout reference.
+- Token guidance covers GitHub App installation tokens as well as fine-grained PATs.
+- Branch-protection guidance distinguishes applicable merge gates from reports and
+  documents the separate live-settings rollout.
+
+### Fixed
+
+- `verify-tier` rejects invalid tier inputs and malformed or out-of-range declarations instead
+  of silently selecting the wrong tier or passing without running any checks.
+- Empty required-check lists no longer establish protection, and unreadable classic or
+  Rulesets data cannot silently produce a complete pass.
+- API requests retain a fixed GitHub origin and reject redirects.
+- Adoption and release instructions no longer contradict SHA-pinning or source identity.
+- The Scorecard recipe now matches this repository's verified v2.5.0 action pin.
+
+The aggregate gate still needs a verified PR run and an administrator's protection-setting
+change. No release, immutable-release setting, or live branch-protection change is made by
+this implementation.
+
 ## [0.2.0] - 2026-09-19
 
 Version 0.1.2 was never tagged, so the changes listed under it in CHANGELOG.md ship in this release too.

@@ -16,6 +16,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { extractChangelogSection, parseVersion, readPinnedRelease, readPlaybookCheckoutRef } from "./verify-lib.mjs";
 
+/** @returns {never} */
 function fail(message) {
   console.error(`release-check: ${message}`);
   process.exit(1);
@@ -28,8 +29,8 @@ if (!pinnedParts) {
   fail("PLAYBOOK_RELEASE in .github/workflows/verify-tier.yml is missing or not a vX.Y.Z tag.");
 }
 const pinnedTag = `v${pinnedParts.join(".")}`;
-if (readPlaybookCheckoutRef(workflow) !== pinnedTag) {
-  fail("The playbook checkout's ref in .github/workflows/verify-tier.yml differs from PLAYBOOK_RELEASE. Set both to the release.");
+if (readPlaybookCheckoutRef(workflow) !== "${{ job.workflow_sha }}") {
+  fail("The playbook checkout's ref must be job.workflow_sha so the script matches the called workflow's exact commit.");
 }
 
 const tagInput = process.env.RELEASE_TAG;
@@ -47,4 +48,4 @@ if (notes === "") {
 }
 
 if (process.env.NOTES_OUT) writeFileSync(process.env.NOTES_OUT, `${notes}\n`);
-console.log(`release-check: ${pinnedTag} is consistent (workflow pin and CHANGELOG section agree).`);
+console.log(`release-check: ${pinnedTag} is consistent (release metadata, source ref and CHANGELOG agree).`);

@@ -26,18 +26,40 @@ proposing a change to the standard.
 
 ## Development setup
 
-There is nothing to build. To run the same checks CI runs:
+There is nothing to build. Use Node.js 22 and Python 3.12. In a Python virtual environment,
+install the development tools from the lockfiles:
+
+```bash
+npm ci --ignore-scripts
+python -m pip install --require-hashes --only-binary :all: --no-deps -r scripts/requirements.txt
+```
+
+Then run the same checks CI runs:
 
 ```bash
 node --test "scripts/**/*.test.mjs"   # unit tests for the verification scripts
-node scripts/release-check.mjs        # workflow pin and CHANGELOG agree
+npm run typecheck                    # production JavaScript, no emitted files
+python -m mypy --check-untyped-defs scripts/validate_yaml.py scripts/check_doc_snippets.py
+python -m pytest scripts/
+node scripts/release-check.mjs       # source-ref contract, release metadata and CHANGELOG
 node scripts/verify-tier.mjs          # this repository against its own standard (set INPUT_TIER=2)
 python scripts/check_doc_snippets.py  # every YAML/JSON snippet in the docs parses (--extract also writes workflow snippets to .snippet-workflows/ for actionlint)
 ```
 
-`actionlint` and `zizmor` lint the workflows; both run offline against a checkout. Install the
-Python dependency from the hash-pinned lockfile:
-`python -m pip install --require-hashes --only-binary :all: --no-deps -r scripts/requirements.txt`.
+`actionlint` and `zizmor` lint the workflows; both run offline against a checkout.
+The verifier itself still runs with Node.js alone; npm packages are development tools.
+The `Required CI` job aggregates `ci.yml` and fails on failed, cancelled, or skipped jobs.
+It does not configure branch protection. See [the rollout procedure](docs/governance.md#branch-protection).
+
+### Workflow-linter compatibility
+
+actionlint 1.7.12 does not recognize GitHub.com's documented `job.workflow_sha` and
+`job.workflow_repository` properties. `.github/actionlint.yaml` ignores only those missing
+property diagnostics in `verify-tier.yml`. Other expression checks remain enabled.
+Repository maintainers own this exception; review it by **2027-02-01** and remove it when
+actionlint supports the fields. The [GitHub announcement](https://github.blog/changelog/2026-09-03-github-actions-early-september-2026-updates/)
+is the upstream evidence. Python tests exercise the fail-closed source guard independently.
+A real cross-repository run is still required before release.
 
 ## Making a change
 
@@ -62,6 +84,9 @@ Python dependency from the hash-pinned lockfile:
 5. Update [CHANGELOG.md](CHANGELOG.md) when a change alters what the standard recommends. If it
    adds or tightens a requirement, add an `### Adopter action` list by tier, so a repository
    following the standard knows what to change.
+
+Follow [the compatibility policy](docs/compatibility.md) when changing public interfaces.
+Do not publish a release as part of an ordinary implementation PR.
 
 ## Using AI coding tools
 

@@ -12,8 +12,8 @@ name: Verify tier
 # What this can and can't check: file/pattern checks (LICENSE, CODEOWNERS,
 # SHA-pinning, etc.) always run. Repo-settings checks (delete-branch-on-merge,
 # Dependabot status, branch protection) need `admin_token`, an admin-scoped
-# PAT passed as a secret: `administration` isn't a grantable GITHUB_TOKEN
-# permission, so there's no way around this without one. Without it, those
+# token passed as a secret (a GitHub App installation token or fine-grained PAT).
+# `administration` isn't a grantable GITHUB_TOKEN permission. Without it, those
 # checks are skipped and reported as such, not silently omitted. See
 # docs/ci-cookbook.md #12 for the full reasoning.
 #
@@ -29,18 +29,10 @@ name: Verify tier
 # added by the pointer block documented in this repo's AGENTS.md) unless the
 # `tier` input below overrides it.
 #
-# PLAYBOOK_RELEASE below is bumped in the same commit as the CHANGELOG entry
-# for every release, and release.yml refuses to publish a tag that disagrees
-# with it. It is hardcoded because there is no reliable way to read back "the
-# ref the caller used to invoke this workflow" from inside a `workflow_call`
-# job (github.action_ref tracks the most recently *run action step*, not the
-# calling ref -- confirmed the hard way, by a real cross-repo run picking up
-# actions/checkout's own SHA instead). Checked out explicitly below, it means
-# the script that runs always matches this exact version of this exact file.
-#
-# The same value is what the run compares against the playbook's latest
-# GitHub Release, to warn a caller that a newer version exists (see
-# docs/ci-cookbook.md #13).
+# job.workflow_sha identifies the called workflow's own commit on GitHub.com.
+# github.sha and github.workflow_sha identify the caller and must not be used
+# for this checkout. GitHub Enterprise Server is not supported.
+# PLAYBOOK_RELEASE is release-notification metadata, not a source-code ref.
 
 on:
   workflow_call:
@@ -52,33 +44,51 @@ on:
         default: 'auto'
     secrets:
       admin_token:
-        description: 'Optional PAT with repository admin access, for the settings-level checks. Repo-settings checks are skipped, not failed, without it.'
+        description: 'Optional read-only GitHub App installation token or fine-grained PAT for settings checks. Checks are skipped without it.'
         required: false
+    outputs:
+      automated_checks:
+        description: 'passed or failed: the hard checks only, not full compliance.'
+        value: ${{ jobs.verify.outputs.automated_checks }}
+      assessment:
+        description: 'partial or failed: manual requirements and effective enforcement are not certified.'
+        value: ${{ jobs.verify.outputs.assessment }}
 
 permissions:
   contents: read
 
 env:
-  # Bump this alongside every tag (see the comment above), together with the
-  # literal `ref:` of the playbook checkout below. Both name the release this job
-  # checks itself out at, independent of whatever ref the caller used;
-  # scripts/release-check.mjs fails if they differ.
+  # Bump with the CHANGELOG in each release commit. Source identity comes from
+  # job.workflow_sha, independently of this release-notification metadata.
   PLAYBOOK_RELEASE: v0.2.0
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    outputs:
+      automated_checks: ${{ steps.verification.outputs.automated_checks }}
+      assessment: ${{ steps.verification.outputs.assessment }}
     steps:
+      - name: Validate this workflow's source identity
+        env:
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+        run: |
+          if [[ ! "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || [[ "$WORKFLOW_REPOSITORY" != "solarssk/playbook" ]]; then
+            echo "::error::This workflow requires its own source identity on GitHub.com."
+            exit 1
+          fi
+
       - name: Check out the calling repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Check out the playbook itself, at this workflow's own release
+      - name: Check out the playbook at this workflow's exact commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: solarssk/playbook
-          ref: v0.2.0 # a literal, not ${{ env.PLAYBOOK_RELEASE }}; release-check keeps the two equal
+          ref: ${{ job.workflow_sha }}
           path: .playbook-tools
           persist-credentials: false
           sparse-checkout: |
@@ -90,6 +100,7 @@ jobs:
           node-version: "22"
 
       - name: Run tier verification
+        id: verification
         env:
           INPUT_TIER: ${{ inputs.tier }}
           ADMIN_TOKEN: ${{ secrets.admin_token }}

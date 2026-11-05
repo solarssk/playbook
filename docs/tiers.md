@@ -19,6 +19,7 @@ existed or how much anyone likes it.
 - [Tier 2: public tools with real dependents](#tier-2-public-tools-with-real-dependents)
 - [Tier 3: flagship](#tier-3-flagship)
 - [Moving between tiers](#moving-between-tiers)
+- [Assessment and deviations](#assessment-and-deviations)
 
 ## How to pick a tier
 
@@ -52,6 +53,10 @@ required. The last column names the `verify-tier` check that covers it; `manual`
 check exists and a reviewer has to look. A unit test keeps this table and
 `scripts/verify-tier.mjs` in agreement, so a check cannot be added, moved, or dropped in one
 without the other.
+
+The last column describes coverage, not a compliance certificate. A file check can establish
+presence without establishing content or execution. Heuristic checks report `warn` even when
+they find a possible configuration. See [compatibility.md](compatibility.md#verification-results).
 
 | Requirement | 0 | 1 | 2 | 3 | verify-tier |
 |---|---|---|---|---|---|
@@ -217,7 +222,8 @@ handles credentials or PII. Everything in Tier 1, plus:
       changing something a doc describes without anyone remembering to update the doc.
 - [ ] Branch protection actually enforced: required status checks that are genuinely required,
       not merely present as unenforced workflow files, and the list is kept current as jobs are
-      added or renamed.
+      added or renamed. Include every applicable PR gate, not report-only or scheduled-only
+      checks. Classic protection and active Rulesets can both meet this requirement.
 - [ ] Issues and pull requests carry the standard `type:` labels, and a milestone groups the work
       for each release once the repository cuts versions. Start lean; see
       [governance.md](governance.md#labels-and-milestones).
@@ -279,3 +285,11 @@ from, not diligence.
 Demoting a tier is rarer but legitimate: a project that lost its user base, or was always
 over-scoped for what it turned out to become, doesn't owe its former tier's maintenance burden
 forever.
+
+## Assessment and deviations
+
+Record evidence, gaps, and deliberately inapplicable requirements when assessing a repository.
+The verifier does not issue a full-compliance result. A recorded deviation remains an unmet
+requirement, not a hidden pass. See [compatibility.md](compatibility.md#assessment-and-deviations)
+for the decision record and [verification results](compatibility.md#verification-results) for
+what the automated statuses and outputs mean.

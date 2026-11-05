@@ -33,17 +33,17 @@ class Fence:
     marker: str
     language: str
     start: int
-    body: list = field(default_factory=list)
+    body: list[str] = field(default_factory=list)
 
     def closed_by(self, line: str) -> bool:
         closing = FENCE_CLOSE.match(line)
-        return bool(closing) and closing.group(1)[0] == self.marker[0] and len(closing.group(1)) >= len(self.marker)
+        return closing is not None and closing.group(1)[0] == self.marker[0] and len(closing.group(1)) >= len(self.marker)
 
     def add(self, line: str) -> None:
         self.body.append(line[len(self.indent):] if line.startswith(self.indent) else line.lstrip())
 
 
-def parse_fence_open(line: str):
+def parse_fence_open(line: str) -> tuple[str, str, str] | None:
     """Return (indent, marker, language) if `line` opens a fence, else None.
 
     Indentation is accepted at any depth, unlike in verify-lib: this scanner validates examples
@@ -68,7 +68,8 @@ def iter_fences(text: str):
         if fence is None:
             opened = parse_fence_open(line)
             if opened:
-                fence = Fence(*opened, number)
+                indent, marker, language = opened
+                fence = Fence(indent, marker, language, number)
         elif fence.closed_by(line):
             yield fence
             fence = None

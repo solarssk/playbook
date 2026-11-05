@@ -8,3 +8,5 @@ junit-python.xml
 .pytest_cache/
 .coverage
 __pycache__/
+.mypy_cache/
+node_modules/

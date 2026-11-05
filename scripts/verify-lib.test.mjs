@@ -3,17 +3,20 @@ import { test } from "node:test";
 
 import {
   detectDeclaredTier,
+  encodeBranchName,
   escapeTableCell,
   extractChangelogSection,
   findFloatingActionRefs,
   isNewer,
   isReusableOnly,
   parseRepoSlug,
+  parseTier,
   parseVersion,
   readDocsImpactDeclaration,
   readPinnedRelease,
   readPlaybookCheckoutRef,
   reportedCheckPatterns,
+  rulesetStatusCheckContexts,
   stripFencedBlocks,
   stripYamlComments,
   unmatchedRequiredContexts,
@@ -22,6 +25,23 @@ import {
 } from "./verify-lib.mjs";
 
 const SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1";
+
+test("encodeBranchName keeps branches inside one path segment", () => {
+  assert.equal(encodeBranchName("release/current"), "release%2Fcurrent");
+  assert.equal(encodeBranchName("feature/a#b%20"), "feature%2Fa%23b%2520");
+  for (const value of ["", ".", "..", "../main", "/main", "main/", ".hidden", "a/.hidden", "main.lock", "a?b", "a\nb", "@", "a@{b", undefined]) {
+    assert.throws(() => encodeBranchName(value), /Invalid default branch name/);
+  }
+});
+
+test("rulesetStatusCheckContexts validates and deduplicates status check rules", () => {
+  const rule = { type: "required_status_checks", parameters: { required_status_checks: [{ context: "test" }, { context: "test" }] } };
+  assert.deepEqual(rulesetStatusCheckContexts([{ type: "pull_request" }, rule]), ["test"]);
+  for (const invalid of [{}, null, [null], [{ type: "required_status_checks" }],
+    [{ type: "required_status_checks", parameters: { required_status_checks: [{ context: null }] } }]]) {
+    assert.throws(() => rulesetStatusCheckContexts(invalid));
+  }
+});
 
 test("parseVersion accepts vX.Y.Z and X.Y.Z, rejects everything else", () => {
   assert.deepEqual(parseVersion("v0.1.1"), [0, 1, 1]);
@@ -68,9 +88,27 @@ test("findFloatingActionRefs rejects a short SHA", () => {
   assert.deepEqual(findFloatingActionRefs("      - uses: a/b@3d3c42e"), ["a/b@3d3c42e"]);
 });
 
+test("parseTier accepts only a single digit from 0 to 3", () => {
+  for (const tier of ["0", "1", "2", "3"]) assert.equal(parseTier(tier), Number(tier));
+  for (const tier of ["", "abc", "-1", "4", "NaN", "2.5", "02", " 2", "2\n", 2, null, undefined]) {
+    assert.equal(parseTier(tier), null, `should reject ${JSON.stringify(tier)}`);
+  }
+});
+
 test("detectDeclaredTier reads a real declaration", () => {
   assert.equal(detectDeclaredTier("# Agents\n\nTier: 2 (see docs)\n"), 2);
+  assert.equal(detectDeclaredTier("Tier:\t0\r\n"), 0);
+  assert.equal(detectDeclaredTier("Tier: 3\n"), 3);
   assert.equal(detectDeclaredTier("nothing here"), null);
+});
+
+test("detectDeclaredTier rejects malformed and out-of-range declarations", () => {
+  for (const declaration of [
+    "Tier: 4", "Tier: -1", "Tier: NaN", "Tier: abc", "Tier:", "Tier:\n2",
+    "Tier: 2.5", "Tier: 2extra", "Tier: 02", "Tier: 4\nTier: 2",
+  ]) {
+    assert.equal(detectDeclaredTier(declaration), null, declaration);
+  }
 });
 
 test("detectDeclaredTier ignores a Tier line quoted inside a fenced block", () => {
