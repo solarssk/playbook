@@ -6,11 +6,17 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-05
+
 ### Adopter action
 
 - **All tiers:** use `auto` or one literal digit from `0` to `3` for the verifier tier.
   Fix malformed `Tier:` declarations. Pin reusable-workflow calls to full commit SHAs.
   Read warnings, skips, and manual requirements before claiming compliance.
+- **All tiers, if calling `verify-tier`:** bump the pinned SHA to the commit behind `v0.3.0`
+  to get exact source identity. The `v0.2.0` workflow checks out the verifier by tag and
+  does not provide this guarantee. GitHub Enterprise Server is unsupported. Keep any
+  administrative read token on trusted settings-check paths, not PR paths.
 - **All tiers, if deviating from a requirement:** record the requirement, tier, reason,
   accountable role, approval, review date, and remediation. A recorded gap is not a pass.
 - **All tiers, if using `codecov/test-results-action`:** replace it with a full-SHA-pinned
@@ -21,11 +27,6 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
   report-only checks on every PR. Adding a workflow does not update GitHub settings.
 - **Tier 3:** verify both the coverage and code-quality gates, including their thresholds
   and merge enforcement. A text match for either tool is not sufficient.
-- **Reusable-workflow callers:** pin to a published release containing the source-identity
-  fix. `v0.2.0` still checks out the verifier by tag, even when its caller pins a SHA.
-  The fixed workflow uses GitHub.com's called-workflow source context and fails if it is
-  unavailable. GHES is unsupported. Keep administrative read tokens on trusted
-  settings-check paths, not PR paths.
 
 ### Added
 
