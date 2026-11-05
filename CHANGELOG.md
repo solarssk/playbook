@@ -62,6 +62,12 @@ fails and GitHub marks the PR as blocked. Administrators can still bypass protec
 other PR gates and the administrator bypass policy still need review. No release or
 immutable-release setting change is made by this implementation.
 
+Cross-repository trials verified that the verifier source is checked out at the called
+workflow's exact SHA and runs on Node.js 26. A declared Tier 2 repository returned
+`passed` / `partial`. A repository without a tier declaration failed on missing files
+with an explicit Tier 1 input and returned `failed` / `failed`; `auto` failed before
+producing outputs. No administrative token was supplied, so settings checks were skipped.
+
 ## [0.2.0] - 2026-09-19
 
 Version 0.1.2 was never tagged, so the changes listed under it in CHANGELOG.md ship in this release too.
