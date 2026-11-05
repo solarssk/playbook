@@ -61,9 +61,8 @@ All notable changes are documented here. Entries are grouped under `### Added`, 
 The aggregate gate has passed real PR runs, and `Required CI` is now required in this
 repository's branch protection. A temporary PR with a failing test confirmed that the gate
 fails and GitHub marks the PR as blocked. The protection also applies to administrators.
-CodeQL, dependency review, and OSV have their own required contexts. The documentation-impact
-check is not yet required. No release or immutable-release setting change is made by this
-implementation.
+CodeQL, dependency review, OSV, and the documentation-impact check have their own required
+contexts. No release or immutable-release setting change is made by this implementation.
 
 Cross-repository trials verified that the verifier source is checked out at the called
 workflow's exact SHA and runs on Node.js 26. A declared Tier 2 repository returned
