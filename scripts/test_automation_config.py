@@ -1,10 +1,13 @@
 """Keep Node.js and Dependabot configuration aligned with the repository's CI."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
 import yaml
+
+import check_doc_snippets
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -99,3 +102,41 @@ def test_dependency_review_covers_all_dependency_scopes():
         "development",
         "unknown",
     }
+
+
+@pytest.mark.parametrize(
+    ("source", "expected_files"),
+    [
+        ("workflow", {"junit.xml", "junit-python.xml"}),
+        ("cookbook", {"junit.xml"}),
+    ],
+)
+def test_codecov_test_results_upload_matches_coverage_action(source, expected_files):
+    if source == "workflow":
+        path = ROOT / ".github/workflows/ci.yml"
+        workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
+        steps = workflow["jobs"]["test"]["steps"]
+    else:
+        path = ROOT / "docs/ci-cookbook.md"
+        fences = [
+            fence
+            for fence in check_doc_snippets.iter_fences(path.read_text(encoding="utf-8"))
+            if fence.language == "yaml"
+            and any("Upload test results to Codecov" in line for line in fence.body)
+        ]
+        assert len(fences) == 1
+        steps = yaml.safe_load("\n".join(fences[0].body))
+
+    coverage = [step for step in steps if step.get("name") == "Upload coverage to Codecov"]
+    results = [step for step in steps if step.get("name") == "Upload test results to Codecov"]
+    assert len(coverage) == len(results) == 1
+    upload = results[0]
+    assert re.fullmatch(r"codecov/codecov-action@[0-9a-f]{40}", upload["uses"])
+    assert upload["uses"] == coverage[0]["uses"]
+    assert upload["if"] == "${{ !cancelled() && env.CODECOV_TOKEN != '' }}"
+    assert upload["env"]["CODECOV_TOKEN"] == "${{ secrets.CODECOV_TOKEN }}"
+    settings = upload["with"]
+    assert settings["token"] == "${{ env.CODECOV_TOKEN }}"
+    assert {name.strip() for name in settings["files"].split(",")} == expected_files
+    assert settings["report_type"] == "test_results"
+    assert settings["fail_ci_if_error"] is False

@@ -703,17 +703,22 @@ lines once `pytest --cov`/`vitest --coverage`/equivalent is already producing a 
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && env.CODECOV_TOKEN != '' }}
-        uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3  # v1.2.1
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5  # v7.1.1
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           token: ${{ env.CODECOV_TOKEN }}
           files: junit.xml
+          report_type: test_results
+          fail_ci_if_error: false
 ```
 
 A step's own `env:` block is evaluated before that same step's `if:` condition, so checking
 `env.CODECOV_TOKEN` inside the same step's `if:` is a valid, working way to skip cleanly on fork PRs
 without a separate job-level `env:` block (the same pattern is used for `SONAR_TOKEN` in §10).
+The action runs separately for coverage and test results. `report_type: test_results` sends the
+JUnit report to Test Analytics, not to coverage. The test-results upload remains non-blocking on
+an upload error; the coverage upload fails CI on an upload error.
 
 4. Add a `codecov.yml` at the repo root to make thresholds explicit instead of relying on Codecov's
    undocumented defaults:
