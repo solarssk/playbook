@@ -1,16 +1,8 @@
 # The tier system
 
-Every repository gets more maintenance ceremony as it grows: more CI checks, more governance
-files, more process. The mistake most "engineering standards" documents make is picking one
-target, usually whatever the most mature project in the org already does, and treating it as the
-bar for everything. Applying a flagship SaaS product's checklist to a two-file configuration repo
-is cargo-culting, not rigor. Nobody reads a DAST scan report for a repo with no running service,
-and a CycloneDX SBOM for a repo with zero dependencies is theater.
-
-This document defines four tiers. Each tier is **strictly additive** on the one before it. Tier 2
-requires everything in Tier 1 plus its own list, not a different list. A repository's tier is a
-property of what it *is* (its blast radius, its audience, what it ships), not of how long it's
-existed or how much anyone likes it.
+Choose requirements by blast radius, audience, and what a repository ships, not its age or ambition.
+The four tiers are **strictly additive**: Tier 2 requires Tiers 0 and 1 plus its own list.
+A flagship project's controls are not the baseline for a configuration repo.
 
 - [How to pick a tier](#how-to-pick-a-tier)
 - [At a glance](#at-a-glance)
@@ -35,28 +27,24 @@ Ask these questions in order. Stop at the first "yes."
    one maintainer and few or no other users?** Then Tier 1.
 4. **Is it empty, a placeholder, or pre-code?** Then Tier 0 only, until there's something to tier.
 
-Tier 3 isn't something you pick. A repository earns it by actually operating at flagship scale:
-multiple services, an install base beyond the maintainer, compliance or audit obligations. Don't
-promote a repository to Tier 3 to feel thorough. Promote it when Tier 2 is visibly insufficient
-for what the repository has become.
+Tier 3 is earned at flagship scale: multiple services, an install base beyond the maintainer,
+compliance or audit obligations. Promote only when Tier 2 is visibly insufficient.
 
-When unsure between two tiers, undershoot. It's cheap to add a control later when a project's
-scope grows. It's expensive to maintain SAST/SBOM/DAST machinery nobody looks at for a project
-that never grew into needing it. A pile of unread security-scan artifacts is not a security
-posture.
+When unsure between two tiers, undershoot. Add controls as scope grows rather than maintaining
+scans nobody reads.
 
 ## At a glance
 
-Every requirement, by tier. `✓` means required at that tier and every tier above it (the tiers are
-additive). `if ...` means required only when the condition holds. `opt` means optional, never
-required. The last column names the `verify-tier` check that covers it; `manual` means no automatic
-check exists and a reviewer has to look. A unit test keeps this table and
-`scripts/verify-tier.mjs` in agreement, so a check cannot be added, moved, or dropped in one
-without the other.
+Read the table with these rules:
 
-The last column describes coverage, not a compliance certificate. A file check can establish
-presence without establishing content or execution. Heuristic checks report `warn` even when
-they find a possible configuration. See [compatibility.md](compatibility.md#verification-results).
+- `✓`: required at this tier and every tier above it
+- `if ...`: required only when the condition holds
+- `opt`: optional, never required
+- `manual`: no automated check; a reviewer must assess it
+
+The last column names automated coverage, not proof of compliance. Presence does not establish
+content or execution; heuristic matches remain `warn`. See [verification results](compatibility.md#verification-results).
+A unit test keeps this table and `scripts/verify-tier.mjs` in agreement; update both when changing a check.
 
 | Requirement | 0 | 1 | 2 | 3 | verify-tier |
 |---|---|---|---|---|---|
@@ -275,16 +263,16 @@ advance.
 
 ## Moving between tiers
 
-Promoting a repository to a higher tier is a deliberate act, prompted by the repository's own
-growth: it started shipping a container image, a second person now depends on it, it started
-handling another party's data. It is never done reflexively to "be thorough," and never done by
-copying a higher-tier repository's file list wholesale without asking whether each item earns its
-keep here. A Tier 1 tool with a Trivy scan and no container image is a checkbox nobody benefits
-from, not diligence.
+Change tiers deliberately when the repository changes:
 
-Demoting a tier is rarer but legitimate: a project that lost its user base, or was always
-over-scoped for what it turned out to become, doesn't owe its former tier's maintenance burden
-forever.
+| Change | Decision |
+|---|---|
+| Starts publishing an image, gains dependents, or handles another party's data | Reassess against [the selection questions](#how-to-pick-a-tier) |
+| Reaches flagship scale and outgrows Tier 2 | Promote to Tier 3 |
+| Loses its user base or proves over-scoped | Demotion is legitimate if the lower tier fits |
+
+Do not promote for completeness or copy a higher-tier file list wholesale.
+Evaluate each control; a container scan adds nothing to a tool with no image.
 
 ## Assessment and deviations
 

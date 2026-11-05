@@ -1,22 +1,18 @@
-# Writing SECURITY.md and Structuring Vulnerability Disclosure
+# Write SECURITY.md and structure vulnerability disclosure
 
-This document is the deep-dive companion to the `SECURITY.md` and
-vulnerability-disclosure items in [docs/tiers.md](tiers.md)'s per-tier
-checklists, the same relationship [governance.md](governance.md) has to the
-repo-settings items there. It uses the same tiers: **Tier 0** (every
-repository), **Tier 1** (small, single-purpose tools), **Tier 2** (public
-tools with real dependents), **Tier 3** (flagship). Every repo beyond "empty
-or pre-code" needs a private way for someone to tell you about a
-vulnerability before it's public; how much document sits around that channel
-grows with the tier.
+Document a private reporting channel, realistic response times, and the security controls that
+actually run. Every repository beyond empty or pre-code needs private disclosure; documentation
+depth grows with [its tier](tiers.md).
+
+- [Private reporting](#why-a-private-reporting-channel-not-a-public-issue)
+- [Response times](#state-a-response-time-sla-even-an-informal-one)
+- [Policy sections by tier](#structuring-securitymd-by-tier)
+- [Accepted license risks](#third-party-noticesmd-documenting-an-accepted-license-risk)
 
 ## Why a private reporting channel, not a public issue
 
-A public issue tracker is the wrong place for an unpatched vulnerability
-report for one structural reason: everyone who can see the repo can see the
-report, including anyone who might exploit it before a fix ships. A reporter
-needs a channel that reaches the maintainer without simultaneously
-broadcasting the exploit. GitHub provides this natively:
+A public issue exposes an unpatched vulnerability to anyone who can read the repository.
+Use a private channel that reaches the maintainer without publishing the exploit:
 
 - **GitHub Security Advisories / private vulnerability reporting**
   (preferred): a repo with private vulnerability reporting enabled shows a
@@ -31,28 +27,17 @@ broadcasting the exploit. GitHub provides this natively:
   for reporters who don't want to use the advisory flow or for repos where it
   isn't enabled yet.
 
-`SECURITY.md` itself doesn't create the private channel. It **documents**
-one that repo settings already provide, and tells reporters explicitly not to
-use the public issue tracker instead. Both matter: the settings toggle
-without the documentation leaves reporters guessing where to go, and the
-documentation without the toggle points at a form that doesn't exist. Per
-[tiers.md's Tier 1 checklist](tiers.md#tier-1-small-single-purpose-tools),
-the written policy itself is the one Tier 0-to-1 item that's a real file, not
-just a toggle: "how do I report a security issue" has no sane
-settings-only answer.
+`SECURITY.md` documents the channel; it does not create it. Enable private reporting in settings
+and explicitly tell reporters not to use public issues. Without the toggle, the policy points
+at a nonexistent form; without the policy, reporters must guess where to go.
+The [Tier 1 checklist](tiers.md#tier-1-small-single-purpose-tools) requires the written policy,
+not only the Tier 0 toggle.
 
 ## State a response-time SLA, even an informal one
 
-"We aim to acknowledge reports within 48 hours" costs one sentence and
-changes the reporter's experience substantially: it tells them silence for
-the first two days is normal, not a sign the report went nowhere, and gives
-them a concrete point at which a follow-up nudge is reasonable. This holds
-even for a Tier 1 repo with one maintainer and no formal support process:
-an informal, best-effort SLA is still better than no stated expectation,
-because the alternative isn't "no promise," it's "the reporter doesn't know
-if this is being looked at." Pick numbers that can actually be hit; a missed
-informal SLA is a minor trust ding, a pattern of missed SLAs is worse than
-never stating one.
+State a realistic acknowledgment target, even at Tier 1: "We aim to acknowledge reports within
+48 hours" tells reporters when to follow up. A best-effort service-level agreement (SLA) is enough;
+choose a target you can meet. Repeated missed targets undermine trust.
 
 ## Structuring SECURITY.md by tier
 
@@ -85,30 +70,16 @@ something security-relevant.
 
 ### Tier 2 and up: the "active automated checks" table
 
-[tiers.md's Tier 2 checklist](tiers.md#tier-2-public-tools-with-real-dependents)
-adds tests, type-checking, and SAST on top of Tier 1's own dependency audit
-and secret-scan steps. Once those exist, the highest-value addition to
-`SECURITY.md` is a
-table mapping each security-relevant control to **where it actually runs**,
-the specific workflow file (and job, if the workflow has several). This is
-falsifiable in a way a prose paragraph isn't: a reader can open the named
-file and confirm the claim directly.
+Tier 2 adds tests, type checks, and static application security testing (SAST) to Tier 1's
+dependency audit and secret scan. Map each security control to **where it actually runs** so
+readers can verify it:
 
-Falsifiable is not the same as self-maintaining, though. "The maintainer
-will notice when a control quietly stopped running" is exactly the
-assumption that doesn't hold: a real audit of a repo following this pattern
-found this table undercounting its own required checks by two, for weeks,
-with nothing surfacing it. Pair this table with the PR-time documentation
-declaration in
-[ci-cookbook.md §12](ci-cookbook.md#12-docs-as-source-of-truth-and-catching-stale-docs-at-pr-time)
-so a PR that changes a workflow this table describes is required to say
-whether the table needs updating too, rather than relying on memory.
+- One row per real control, stating what it checks, when it runs, and the workflow file
+- The job name when a workflow has multiple jobs
+- No fixed tool list; use the [cookbook](ci-cookbook.md) for wiring and remove rows when controls disappear
 
-Structure: one row per control, with, at minimum, what it checks, when it
-runs, and the workflow file. This is a pattern, not a fixed list; use
-whatever controls the repo actually has (see
-[ci-cookbook.md](ci-cookbook.md) for the exact wiring of each), and drop the
-row the day the control is removed rather than leaving a stale entry.
+Pair the table with the [PR-time documentation declaration](ci-cookbook.md#12-docs-as-source-of-truth-and-catching-stale-docs-at-pr-time).
+A PR changing a described workflow must say whether the table needs updating; do not rely on memory.
 
 ```markdown
 ## Security controls / CI
